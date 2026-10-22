@@ -29,7 +29,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $pluginName = 'dsh-approval-hud'
-$pluginVersion = '0.1.0'
+$pluginVersion = '0.2.0'
 $packageRoot = $PSScriptRoot
 
 function Write-Step([string]$Message) {

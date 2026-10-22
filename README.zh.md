@@ -32,11 +32,11 @@ DSH 默认把审批卡片放在对话输入框上方。窗口切走之后，agen
 
 ### 方式 A：插件管理器
 
-1. 保留 `dsh-approval-hud` 文件夹，或已经打好的 `dsh-approval-hud-0.1.0.tgz`。
+1. 保留 `dsh-approval-hud` 文件夹，或已经打好的 `dsh-approval-hud-0.2.0.tgz`。
 2. 打开 DSH 的**插件**页面（侧边栏 → 插件，或设置 → 插件）。
 3. 添加插件，填绝对路径：
    - 文件夹：`link:C:\你的路径\dsh-approval-hud`
-   - 安装包：`file:C:\你的路径\dsh-approval-hud-0.1.0.tgz`
+   - 安装包：`file:C:\你的路径\dsh-approval-hud-0.2.0.tgz`
 4. 重启 DSH。
 5. 托盘出现盾牌图标，表示浮窗进程已启动。
 
@@ -105,6 +105,8 @@ dsh plugin --profile desktop add "link:C:\你的路径\dsh-approval-hud"
     idleMode: hide           # hide | compact
     sound: true
     showProject: true
+    followVirtualDesktop: true
+    keepTopmost: true
     maxReasonChars: 600
     language: zh             # zh | en
     startupTimeoutMs: 15000
@@ -118,6 +120,8 @@ dsh plugin --profile desktop add "link:C:\你的路径\dsh-approval-hud"
 | `idleMode` | `hide` | 无待审批时隐藏，或显示一条 42px 状态栏 |
 | `sound` | `true` | 新审批出现时播放系统提示音 |
 | `showProject` | `true` | 在卡片上显示会话工作目录名 |
+| `followVirtualDesktop` | `true` | 跟随 Windows 虚拟桌面切换；窗口移到当前桌面 |
+| `keepTopmost` | `true` | 显示期间周期性重新置顶，避免被普通窗口盖住 |
 | `maxReasonChars` | `600` | 理由最多显示多少字符 |
 | `language` | `zh` | 卡片文案语言 |
 | `startupTimeoutMs` | `15000` | PowerShell 浮窗多久没就绪就回退到 DSH |
@@ -126,6 +130,7 @@ dsh plugin --profile desktop add "link:C:\你的路径\dsh-approval-hud"
 ## 行为与回退
 
 - 浮窗就绪时，插件**先**拿到审批；DSH 原生面板不会同时出现。
+- 切换 Windows 虚拟桌面（`Win+Ctrl+←/→`）时，浮窗会在约 1–2 秒内跟到当前桌面，并重新置顶、不抢焦点。Windows 10/11 的 `IVirtualDesktopManager` 不可用时（例如被安全软件禁用），窗口留在原桌面，功能不受影响。
 - 浮窗未就绪、启动失败、进程退出、你点了托盘“退出”，审批会**自动交给下一个 answerer**，也就是 DSH 原生卡片。
 - 浮窗进程意外退出时，当前排队的审批会立即交回 DSH；插件最多自动重启 3 次。
 - 点击“在 DSH 中处理”只影响当前这一条，后续审批仍走浮窗。

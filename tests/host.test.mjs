@@ -121,6 +121,8 @@ test('normalizeConfig clamps invalid values', () => {
   assert.equal(config.maxReasonChars, 120)
   assert.equal(config.startupTimeoutMs, 3000)
   assert.equal(config.sound, false)
+  assert.equal(config.followVirtualDesktop, true)
+  assert.equal(config.keepTopmost, true)
 })
 
 test('cleanText collapses and truncates long reasons', () => {

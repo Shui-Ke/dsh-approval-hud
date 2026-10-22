@@ -13,8 +13,10 @@ const here = dirname(fileURLToPath(import.meta.url))
 const root = dirname(here)
 const uiScript = join(root, 'ui', 'hud.ps1')
 const renderTo = process.argv[2] ?? join(root, 'prototype', 'ui-preview.png')
+const dataDir = join(root, 'prototype', 'data')
 const token = randomBytes(16).toString('hex')
 mkdirSync(dirname(renderTo), { recursive: true })
+mkdirSync(dataDir, { recursive: true })
 const answers = []
 
 const item = {
@@ -79,7 +81,7 @@ server.listen(0, '127.0.0.1', () => {
     '-NoLogo', '-NoProfile', '-NonInteractive', '-STA', '-ExecutionPolicy', 'Bypass',
     '-WindowStyle', 'Hidden', '-File', uiScript,
     '-Port', String(port), '-Token', token, '-ParentPid', String(process.pid),
-    '-Language', 'zh', '-DebugLog', '-RenderTo', renderTo,
+    '-Language', 'zh', '-DataDir', dataDir, '-DebugLog', '-RenderTo', renderTo,
   ]
   const child = spawn('powershell.exe', args, { windowsHide: true, stdio: 'inherit' })
   child.on('exit', (code) => {

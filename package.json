@@ -1,6 +1,6 @@
 {
   "name": "dsh-approval-hud",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Always-on-top Windows approval window for DeepSeek Harness: approve or reject tool permissions while you work in other windows.",
   "license": "MIT",
   "type": "module",

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0 — 2026-10-22
+
+- Follow Windows virtual-desktop switches: the card moves to the current desktop within about one second.
+- Re-assert `HWND_TOPMOST` while the card is visible, so ordinary windows cannot cover it.
+- Add `followVirtualDesktop` and `keepTopmost` switches (both default `true`).
+- Re-assert topmost immediately after a desktop move, without stealing focus.
+
 ## 0.1.0 — 2026-10-22
 
 - First release.

@@ -32,11 +32,11 @@ A restart of the DSH process is required; refreshing the page is not enough.
 
 ### A. Plugin manager
 
-1. Keep the `dsh-approval-hud` folder or the packed `dsh-approval-hud-0.1.0.tgz`.
+1. Keep the `dsh-approval-hud` folder or the packed `dsh-approval-hud-0.2.0.tgz`.
 2. Open DSH's **Plugins** page.
 3. Add a plugin by absolute spec:
    - folder: `link:C:\path\to\dsh-approval-hud`
-   - tarball: `file:C:\path\to\dsh-approval-hud-0.1.0.tgz`
+   - tarball: `file:C:\path\to\dsh-approval-hud-0.2.0.tgz`
 4. Restart DSH. A shield icon appears in the tray.
 
 ### B. install.ps1 (most reliable)
@@ -91,13 +91,15 @@ Override the plugin row in the profile's `cordis.patch.yml`. A patch replaces th
     idleMode: hide           # hide | compact
     sound: true
     showProject: true
+    followVirtualDesktop: true
+    keepTopmost: true
     maxReasonChars: 600
     language: en             # zh | en
     startupTimeoutMs: 15000
     debug: false
 ```
 
-`enabled: false` restores the normal DSH approval card. `debug: true` writes `plugin.log` and `ui.log` under `%LOCALAPPDATA%\dsh-approval-hud\`.
+`enabled: false` restores the normal DSH approval card. `followVirtualDesktop` moves the card to the current Windows virtual desktop when you press `Win+Ctrl+←/→`; `keepTopmost` re-asserts HWND_TOPMOST while the card is visible. `debug: true` writes `plugin.log` and `ui.log` under `%LOCALAPPDATA%\dsh-approval-hud\`.
 
 ## Fallback and safety
 

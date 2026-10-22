@@ -63,6 +63,91 @@ namespace DshApprovalHud {
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr GetShellWindow();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr GetDesktopWindow();
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern IntPtr FindWindow(string className, string windowName);
+
+    [ComImport, Guid("AA509086-5CA9-4C25-8F95-589D3C07B48A")]
+    private class VirtualDesktopManagerClass {
+    }
+
+    [ComImport, Guid("A5CD92FF-29BE-454C-8D04-D82879FB3F1B"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IVirtualDesktopManager {
+      [PreserveSig]
+      int IsWindowOnCurrentVirtualDesktop(IntPtr topLevelWindow, [MarshalAs(UnmanagedType.Bool)] out bool onCurrentDesktop);
+
+      [PreserveSig]
+      int GetWindowDesktopId(IntPtr topLevelWindow, out Guid desktopId);
+
+      [PreserveSig]
+      int MoveWindowToDesktop(IntPtr topLevelWindow, [In] ref Guid desktopId);
+    }
+
+    private static IVirtualDesktopManager virtualDesktopManager;
+    private static bool virtualDesktopManagerLoaded;
+
+    private static IVirtualDesktopManager VirtualDesktopManager {
+      get {
+        if (!virtualDesktopManagerLoaded) {
+          virtualDesktopManagerLoaded = true;
+          try {
+            virtualDesktopManager = (IVirtualDesktopManager)new VirtualDesktopManagerClass();
+          } catch {
+            virtualDesktopManager = null;
+          }
+        }
+        return virtualDesktopManager;
+      }
+    }
+
+    public static bool VirtualDesktopSupported() {
+      return VirtualDesktopManager != null;
+    }
+
+    public static bool IsOnCurrentVirtualDesktop(IntPtr hWnd) {
+      IVirtualDesktopManager manager = VirtualDesktopManager;
+      if (manager == null || hWnd == IntPtr.Zero) return true;
+      try {
+        bool onCurrent;
+        return manager.IsWindowOnCurrentVirtualDesktop(hWnd, out onCurrent) == 0 ? onCurrent : true;
+      } catch {
+        return true;
+      }
+    }
+
+    public static Guid CurrentVirtualDesktopId() {
+      IVirtualDesktopManager manager = VirtualDesktopManager;
+      if (manager == null) return Guid.Empty;
+      IntPtr source = GetForegroundWindow();
+      if (source == IntPtr.Zero) source = GetShellWindow();
+      if (source == IntPtr.Zero) source = FindWindow("Shell_TrayWnd", null);
+      if (source == IntPtr.Zero) source = GetDesktopWindow();
+      if (source == IntPtr.Zero) return Guid.Empty;
+      try {
+        Guid id;
+        return manager.GetWindowDesktopId(source, out id) == 0 ? id : Guid.Empty;
+      } catch {
+        return Guid.Empty;
+      }
+    }
+
+    public static bool MoveToCurrentVirtualDesktop(IntPtr hWnd) {
+      IVirtualDesktopManager manager = VirtualDesktopManager;
+      if (manager == null || hWnd == IntPtr.Zero) return false;
+      Guid id = CurrentVirtualDesktopId();
+      if (id == Guid.Empty) return false;
+      try {
+        return manager.MoveWindowToDesktop(hWnd, ref id) == 0;
+      } catch {
+        return false;
+      }
+    }
   }
 }
 '@
@@ -173,6 +258,8 @@ $script:AutoSeenAt = $null
 $script:Rendered = $false
 $script:SavedPosition = $null
 $script:RenderTo = $RenderTo
+$script:LastDesktopAttempt = [DateTime]::MinValue
+$script:LastDesktopFailureLog = [DateTime]::MinValue
 
 function Set-Labels {
   $allowButton.Content = T 'allow' 'Allow once'
@@ -316,6 +403,63 @@ function Place-Window {
   $window.Top = $top
 }
 
+function Keep-Topmost {
+  if ($script:Quitting -or $null -eq $window -or -not $window.IsVisible) { return }
+  $keep = $true
+  if ($null -ne $script:CurrentConfig -and $null -ne $script:CurrentConfig.keepTopmost) {
+    $keep = [bool]$script:CurrentConfig.keepTopmost
+  }
+  if (-not $keep) { return }
+  try {
+    $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
+    if ($helper.Handle -ne [IntPtr]::Zero) {
+      # HWND_TOPMOST, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE
+      [void][DshApprovalHud.Native]::SetWindowPos($helper.Handle, [IntPtr](-1), 0, 0, 0, 0, 0x0013)
+    }
+  } catch {
+    # WPF's Topmost property remains the fallback.
+  }
+}
+
+function Sync-VirtualDesktop {
+  param([switch]$Force)
+  if ($script:Quitting -or $null -eq $window -or -not $window.IsVisible) { return }
+  $follow = $true
+  if ($null -ne $script:CurrentConfig -and $null -ne $script:CurrentConfig.followVirtualDesktop) {
+    $follow = [bool]$script:CurrentConfig.followVirtualDesktop
+  }
+  if (-not $follow) { return }
+  # Do not yank the window while the user is dragging it between monitors.
+  if ([System.Windows.Input.Mouse]::LeftButton -eq [System.Windows.Input.MouseButtonState]::Pressed) { return }
+  if (-not $Force -and ([DateTime]::UtcNow - $script:LastDesktopAttempt).TotalMilliseconds -lt 500) { return }
+  $script:LastDesktopAttempt = [DateTime]::UtcNow
+  try {
+    if (-not [DshApprovalHud.Native]::VirtualDesktopSupported()) {
+      if (([DateTime]::UtcNow - $script:LastDesktopFailureLog).TotalSeconds -gt 60) {
+        $script:LastDesktopFailureLog = [DateTime]::UtcNow
+        Write-UiLog 'virtual desktop: IVirtualDesktopManager unavailable'
+      }
+      return
+    }
+    $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
+    $hwnd = $helper.Handle
+    if ($hwnd -eq [IntPtr]::Zero) { return }
+    if ([DshApprovalHud.Native]::IsOnCurrentVirtualDesktop($hwnd)) { return }
+    if ([DshApprovalHud.Native]::MoveToCurrentVirtualDesktop($hwnd)) {
+      Write-UiLog 'virtual desktop: moved to current'
+      Keep-Topmost
+    } elseif (([DateTime]::UtcNow - $script:LastDesktopFailureLog).TotalSeconds -gt 60) {
+      $script:LastDesktopFailureLog = [DateTime]::UtcNow
+      Write-UiLog 'virtual desktop: move failed'
+    }
+  } catch {
+    if (([DateTime]::UtcNow - $script:LastDesktopFailureLog).TotalSeconds -gt 60) {
+      $script:LastDesktopFailureLog = [DateTime]::UtcNow
+      Write-UiLog ('virtual desktop error: ' + $_.Exception.Message)
+    }
+  }
+}
+
 function Show-HudWindow {
   Write-UiLog ('show-window visible=' + $window.IsVisible + ' positioned=' + $script:Positioned)
   if (-not $window.IsVisible) {
@@ -346,6 +490,13 @@ function Show-HudWindow {
   } catch {
     # Topmost from WPF is enough if the native call is unavailable.
   }
+  try {
+    $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
+    $onCurrent = [DshApprovalHud.Native]::IsOnCurrentVirtualDesktop($helper.Handle)
+    $currentId = [DshApprovalHud.Native]::CurrentVirtualDesktopId()
+    Write-UiLog ('desktop supported=' + [DshApprovalHud.Native]::VirtualDesktopSupported() + ' onCurrent=' + $onCurrent + ' current=' + $currentId)
+  } catch { }
+  Sync-VirtualDesktop -Force
   $script:Shown = $true
 }
 
@@ -731,6 +882,8 @@ $script:Timer.Add_Tick({
   $script:Tick += 1
   Poll
   Update-Elapsed
+  if (($script:Tick % 2) -eq 0) { Sync-VirtualDesktop }
+  if (($script:Tick % 5) -eq 0) { Keep-Topmost }
   if ($ParentPid -gt 0 -and ($script:Tick % 20) -eq 0) {
     try {
       $parent = Get-Process -Id $ParentPid -ErrorAction SilentlyContinue
