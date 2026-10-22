@@ -1,0 +1,22 @@
+{
+  "waiting": "等待你的审批",
+  "defaultReason": "工具 {0} 请求执行敏感操作。",
+  "allow": "允许一次",
+  "reject": "拒绝",
+  "delegate": "在 DSH 中处理",
+  "waited": "已等待 {0} 秒",
+  "justNow": "刚刚",
+  "counter": "{0} / {1}",
+  "approved": "已允许，等待下一步…",
+  "rejected": "已拒绝，等待下一步…",
+  "gone": "这条请求已处理",
+  "error": "无法连接 DSH，正在重试",
+  "truncated": "\n\n（内容已截断，完整信息见 DSH）",
+  "footer": "Enter 允许 · Esc 拒绝 · 仅本次生效",
+  "idle": "DSH 审批浮窗 · 无待审批",
+  "trayShow": "显示审批窗",
+  "trayQuit": "退出审批浮窗",
+  "trayTip": "DSH 审批浮窗",
+  "trayTipPending": "DSH 审批浮窗 · {0} 个待审批",
+  "subagent": "子任务"
+}

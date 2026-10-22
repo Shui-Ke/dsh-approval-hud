@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="DSH Approval HUD"
+        Width="380"
+        SizeToContent="Height"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="True"
+        WindowStartupLocation="Manual"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        FontFamily="Segoe UI">
+
+  <Window.Resources>
+    <SolidColorBrush x:Key="TextPrimary" Color="#FFF2F4F8"/>
+    <SolidColorBrush x:Key="TextSecondary" Color="#FFC9CEDA"/>
+    <SolidColorBrush x:Key="TextMuted" Color="#FF8A93A6"/>
+    <SolidColorBrush x:Key="TextFaint" Color="#FF7A8496"/>
+    <SolidColorBrush x:Key="Accent" Color="#FF4D6BFE"/>
+    <SolidColorBrush x:Key="AccentHover" Color="#FF5E7AFF"/>
+    <SolidColorBrush x:Key="AccentPressed" Color="#FF3F58D8"/>
+    <SolidColorBrush x:Key="CardFill" Color="#F2181A1F"/>
+    <SolidColorBrush x:Key="CardStroke" Color="#26FFFFFF"/>
+    <SolidColorBrush x:Key="Warn" Color="#FFF3B34D"/>
+
+    <Style x:Key="PrimaryButton" TargetType="Button">
+      <Setter Property="Foreground" Value="#FFFFFFFF"/>
+      <Setter Property="FontSize" Value="12.5"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Background" Value="{StaticResource Accent}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border Background="{TemplateBinding Background}" CornerRadius="8" Padding="16,7">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter Property="Background" Value="{StaticResource AccentHover}"/>
+        </Trigger>
+        <Trigger Property="IsPressed" Value="True">
+          <Setter Property="Background" Value="{StaticResource AccentPressed}"/>
+        </Trigger>
+        <Trigger Property="IsEnabled" Value="False">
+          <Setter Property="Opacity" Value="0.45"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="SecondaryButton" TargetType="Button">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+      <Setter Property="FontSize" Value="12.5"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="14,6">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter Property="Background" Value="#14FFFFFF"/>
+        </Trigger>
+        <Trigger Property="IsPressed" Value="True">
+          <Setter Property="Background" Value="#1FFFFFFF"/>
+        </Trigger>
+        <Trigger Property="IsEnabled" Value="False">
+          <Setter Property="Opacity" Value="0.45"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="LinkButton" TargetType="Button">
+      <Setter Property="Foreground" Value="#FF8FA6FF"/>
+      <Setter Property="FontSize" Value="11.5"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border Background="Transparent" Padding="2,3">
+              <TextBlock x:Name="Tx" Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}" FontSize="{TemplateBinding FontSize}"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Tx" Property="TextDecorations" Value="Underline"/>
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.45"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="Chip" TargetType="Border">
+      <Setter Property="Background" Value="#1FFFFFFF"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="Padding" Value="6,1"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+  </Window.Resources>
+
+  <Grid Margin="0">
+    <!-- Pending approval card -->
+    <Border x:Name="Card" CornerRadius="14" Background="{StaticResource CardFill}"
+            BorderBrush="{StaticResource CardStroke}" BorderThickness="1">
+
+      <Grid Margin="18,14,18,15">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header; drag anywhere on this row. -->
+        <Grid x:Name="Header" Grid.Row="0" Background="Transparent">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <Ellipse Grid.Column="0" Width="8" Height="8" Fill="{StaticResource Warn}" VerticalAlignment="Center"/>
+          <TextBlock x:Name="StatusText" Grid.Column="1" Margin="8,0,0,0" Text="等待你的审批" TextTrimming="CharacterEllipsis"
+                     FontSize="12" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+          <TextBlock x:Name="ElapsedText" Grid.Column="2" Margin="0,0,10,0" Text=""
+                     FontSize="10.5" Foreground="{StaticResource TextFaint}" VerticalAlignment="Center"/>
+          <TextBlock x:Name="CounterText" Grid.Column="3" Text="1 / 1"
+                     FontSize="11" Foreground="{StaticResource TextFaint}" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Tool identity and source chips -->
+        <Grid Grid.Row="1" Margin="0,13,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <TextBlock x:Name="ToolText" Grid.Column="0" Text="pwsh" MaxWidth="170"
+                     FontFamily="Consolas" FontSize="17" FontWeight="SemiBold"
+                     Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"
+                     VerticalAlignment="Center"/>
+          <Border x:Name="ProjectChip" Grid.Column="1" Style="{StaticResource Chip}" Margin="8,1,0,0" MaxWidth="110">
+            <TextBlock x:Name="ProjectText" Text="" FontSize="10.5" Foreground="{StaticResource TextMuted}"
+                       TextTrimming="CharacterEllipsis"/>
+          </Border>
+          <Border x:Name="SubagentChip" Grid.Column="2" Style="{StaticResource Chip}" Margin="6,1,0,0"
+                  Background="#26F3B34D" Visibility="Collapsed">
+            <TextBlock x:Name="SubagentText" Text="子任务" FontSize="10.5" Foreground="{StaticResource Warn}"/>
+          </Border>
+        </Grid>
+
+        <!-- Reason; hidden scrollbar keeps the card clean, wheel still scrolls. -->
+        <ScrollViewer x:Name="ReasonScroll" Grid.Row="2" Margin="0,8,0,0" MaxHeight="96"
+                      VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled"
+                      Focusable="False" PanningMode="VerticalOnly">
+          <TextBlock x:Name="ReasonText" Text="" FontSize="12.5" LineHeight="19"
+                     TextWrapping="Wrap" Foreground="{StaticResource TextSecondary}"/>
+        </ScrollViewer>
+
+        <!-- Actions -->
+        <Grid Grid.Row="3" Margin="0,14,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <Button x:Name="DelegateButton" Grid.Column="0" Style="{StaticResource LinkButton}"
+                  Content="在 DSH 中处理" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+          <Button x:Name="RejectButton" Grid.Column="1" Style="{StaticResource SecondaryButton}"
+                  Content="拒绝" Margin="0,0,8,0"/>
+          <Button x:Name="AllowButton" Grid.Column="2" Style="{StaticResource PrimaryButton}"
+                  Content="允许一次"/>
+        </Grid>
+
+        <TextBlock x:Name="FooterText" Grid.Row="4" Margin="0,10,0,0"
+                   Text="Enter 允许 · Esc 拒绝 · 仅本次生效"
+                   FontSize="10" Foreground="{StaticResource TextFaint}"/>
+      </Grid>
+    </Border>
+
+    <!-- Idle strip used when idleMode=compact -->
+    <Border x:Name="IdleBar" CornerRadius="12" Background="{StaticResource CardFill}"
+            BorderBrush="{StaticResource CardStroke}" BorderThickness="1" Visibility="Collapsed">
+      <Grid x:Name="IdleHeader" Margin="14,0" Height="42" Background="Transparent">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <Ellipse Grid.Column="0" Width="7" Height="7" Fill="#FF53C08A" VerticalAlignment="Center"/>
+        <TextBlock x:Name="IdleText" Grid.Column="1" Margin="8,0,0,0" Text="DSH 审批浮窗 · 无待审批" FontSize="11.5"
+                   Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+        <TextBlock x:Name="IdleCountText" Grid.Column="2" Text="" FontSize="10.5"
+                   Foreground="{StaticResource TextFaint}" VerticalAlignment="Center"/>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

@@ -1,0 +1,5 @@
+# Insert the host plugin into the composed profile tree. The plugin owns its
+# own defaults, so no config is required here.
+- insert:
+    - id: approval-hud
+      name: dsh-approval-hud

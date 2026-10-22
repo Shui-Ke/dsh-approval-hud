@@ -1,0 +1,22 @@
+{
+  "waiting": "Waiting for your approval",
+  "defaultReason": "Tool {0} requests a sensitive operation.",
+  "allow": "Allow once",
+  "reject": "Reject",
+  "delegate": "Handle in DSH",
+  "waited": "waiting {0}s",
+  "justNow": "just now",
+  "counter": "{0} / {1}",
+  "approved": "Allowed. Waiting for the next step…",
+  "rejected": "Rejected. Waiting for the next step…",
+  "gone": "This request was already handled",
+  "error": "Cannot reach DSH, retrying",
+  "truncated": "\n\n(truncated; see DSH for the full text)",
+  "footer": "Enter allow · Esc reject · this request only",
+  "idle": "DSH Approval HUD · nothing pending",
+  "trayShow": "Show approval window",
+  "trayQuit": "Quit approval window",
+  "trayTip": "DSH Approval HUD",
+  "trayTipPending": "DSH Approval HUD · {0} pending",
+  "subagent": "subagent"
+}

@@ -1,0 +1,10 @@
+node_modules/
+*.tgz
+.npm-pack-cache/
+.pnpm-store/
+prototype/
+tests/.tmp-*
+tools/mock.json
+tools/mock.log
+tools/_extract/
+*.log
