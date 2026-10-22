@@ -1,0 +1,2 @@
+4d3424de8f5bc8ce25f74c43d2ff152fa9e8bb2260046a58e3f6d6d7b18a329d  dsh-approval-hud-0.2.0.tgz
+d4eaac1b858bf131c2a5856fe4d5e59fcc1cd9ca001f2a9b7d7d785bf7a6ccad  dsh-approval-hud-0.2.0.zip

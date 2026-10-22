@@ -1,5 +1,6 @@
 node_modules/
 *.tgz
+!dist/*.tgz
 .npm-pack-cache/
 .pnpm-store/
 prototype/

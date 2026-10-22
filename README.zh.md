@@ -30,6 +30,11 @@ DSH 默认把审批卡片放在对话输入框上方。窗口切走之后，agen
 
 安装后必须**重启 DSH 进程**（桌面版没有 HMR）；只刷新网页不够。
 
+> 不想自己打包？直接下载：
+> [0.2.0 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.2.0.tgz) ·
+> [0.2.0 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.2.0.zip)
+> tgz 给插件管理器；zip 里带 `install.bat`、说明书和插件包。
+
 ### 方式 A：插件管理器
 
 1. 保留 `dsh-approval-hud` 文件夹，或已经打好的 `dsh-approval-hud-0.2.0.tgz`。

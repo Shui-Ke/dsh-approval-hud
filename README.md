@@ -30,6 +30,11 @@ This plugin intercepts `approval/request` on the **host** side and renders each 
 
 A restart of the DSH process is required; refreshing the page is not enough.
 
+> Don't want to pack it yourself? Download:
+> [0.2.0 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.2.0.tgz) ·
+> [0.2.0 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.2.0.zip)
+> The tgz is for the plugin manager; the zip bundles `install.bat`, the docs and the plugin.
+
 ### A. Plugin manager
 
 1. Keep the `dsh-approval-hud` folder or the packed `dsh-approval-hud-0.2.0.tgz`.
