@@ -143,7 +143,7 @@
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="Auto"/>
           </Grid.ColumnDefinitions>
-          <Ellipse Grid.Column="0" Width="8" Height="8" Fill="{StaticResource Warn}" VerticalAlignment="Center"/>
+          <Ellipse x:Name="StatusDot" Grid.Column="0" Width="8" Height="8" Fill="{StaticResource Warn}" VerticalAlignment="Center"/>
           <TextBlock x:Name="StatusText" Grid.Column="1" Margin="8,0,0,0" Text="等待你的审批" TextTrimming="CharacterEllipsis"
                      FontSize="12" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
           <TextBlock x:Name="ElapsedText" Grid.Column="2" Margin="0,0,10,0" Text=""
@@ -197,9 +197,21 @@
                   Content="允许一次"/>
         </Grid>
 
-        <TextBlock x:Name="FooterText" Grid.Row="4" Margin="0,10,0,0"
-                   Text="Enter 允许 · Esc 拒绝 · 仅本次生效"
-                   FontSize="10" Foreground="{StaticResource TextFaint}"/>
+        <Grid Grid.Row="4" Margin="0,10,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <Button x:Name="AutoApproveButton" Grid.Column="0" Style="{StaticResource LinkButton}"
+                  Content="托管 15 分钟" FontSize="10.5" Padding="0,0,0,0"
+                  HorizontalAlignment="Left" VerticalAlignment="Center"
+                  ToolTip="在设定时间内自动同意后续审批；可随时停止"/>
+          <TextBlock x:Name="FooterText" Grid.Column="2" Margin="8,0,0,0"
+                     Text="Enter 允许 · Esc 拒绝 · 仅本次生效"
+                     TextTrimming="CharacterEllipsis" HorizontalAlignment="Right"
+                     FontSize="10" Foreground="{StaticResource TextFaint}" VerticalAlignment="Center"/>
+        </Grid>
       </Grid>
     </Border>
 
@@ -211,11 +223,15 @@
           <ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="*"/>
           <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
-        <Ellipse Grid.Column="0" Width="7" Height="7" Fill="#FF53C08A" VerticalAlignment="Center"/>
+        <Ellipse x:Name="IdleDot" Grid.Column="0" Width="7" Height="7" Fill="#FF53C08A" VerticalAlignment="Center"/>
         <TextBlock x:Name="IdleText" Grid.Column="1" Margin="8,0,0,0" Text="DSH 审批浮窗 · 无待审批" FontSize="11.5"
-                   Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-        <TextBlock x:Name="IdleCountText" Grid.Column="2" Text="" FontSize="10.5"
+                   TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+        <Button x:Name="IdleStopButton" Grid.Column="2" Style="{StaticResource LinkButton}"
+                Content="停止托管" FontSize="10.5" Padding="0,0,0,0" Margin="8,0,0,0"
+                VerticalAlignment="Center" Visibility="Collapsed"/>
+        <TextBlock x:Name="IdleCountText" Grid.Column="3" Margin="8,0,0,0" Text="" FontSize="10.5"
                    Foreground="{StaticResource TextFaint}" VerticalAlignment="Center"/>
       </Grid>
     </Border>

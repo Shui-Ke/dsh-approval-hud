@@ -6,15 +6,29 @@
 
 param(
   [Parameter(Mandatory = $true)][int]$Port,
-  [Parameter(Mandatory = $true)][string]$Token,
+  [string]$Token = '',
   [int]$ParentPid = 0,
   [string]$Language = 'zh',
   [string]$DataDir = '',
   [switch]$DebugLog,
   [string]$RenderTo = '',
   [ValidateSet('', 'allow', 'reject', 'delegate')][string]$AutoAnswer = '',
-  [int]$AutoAnswerAfterMs = 1200
+  [int]$AutoAnswerAfterMs = 1200,
+  [int]$AutoStartMinutes = 0
 )
+
+# The host passes the token over our stdin pipe, never on the command line.
+# A direct -Token argument is still accepted for the preview/smoke tools.
+if ([string]::IsNullOrEmpty($Token)) {
+  try { $Token = [Console]::In.ReadLine() } catch { $Token = '' }
+}
+if ([string]::IsNullOrEmpty($Token)) {
+  try {
+    $errorPath = Join-Path $env:TEMP 'dsh-approval-hud-token-error.log'
+    [IO.File]::AppendAllText($errorPath, ('{0} ui started without a token`r`n' -f (Get-Date).ToString('o')))
+  } catch { }
+  exit 2
+}
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -236,8 +250,12 @@ $delegateButton = Get-Control 'DelegateButton'
 $rejectButton = Get-Control 'RejectButton'
 $allowButton = Get-Control 'AllowButton'
 $footerText = Get-Control 'FooterText'
+$autoApproveButton = Get-Control 'AutoApproveButton'
 $idleText = Get-Control 'IdleText'
+$idleStopButton = Get-Control 'IdleStopButton'
 $idleCountText = Get-Control 'IdleCountText'
+$idleDot = Get-Control 'IdleDot'
+$statusDot = Get-Control 'StatusDot'
 
 $script:CurrentConfig = $null
 $script:CurrentItem = $null
@@ -260,6 +278,9 @@ $script:SavedPosition = $null
 $script:RenderTo = $RenderTo
 $script:LastDesktopAttempt = [DateTime]::MinValue
 $script:LastDesktopFailureLog = [DateTime]::MinValue
+$script:AutoApprove = $null
+$script:AutoMinutes = 15
+$script:IdleNormalBrush = $idleDot.Fill
 
 function Set-Labels {
   $allowButton.Content = T 'allow' 'Allow once'
@@ -269,6 +290,20 @@ function Set-Labels {
   $footerText.Text = T 'footer' 'Enter allow - Esc reject'
   $idleText.Text = T 'idle' 'DSH Approval HUD - nothing pending'
   $subagentText.Text = T 'subagent' 'subagent'
+  $autoApproveButton.ToolTip = T 'autoStartTip' 'Automatically approve requests for the selected time'
+  $idleStopButton.Content = T 'autoStop' 'Stop auto-approve'
+  if ($null -ne $script:Auto15MenuItem) {
+    $script:Auto15MenuItem.Text = T 'trayAuto15' 'Auto-approve for 15 min'
+  }
+  if ($null -ne $script:Auto30MenuItem) {
+    $script:Auto30MenuItem.Text = T 'trayAuto30' 'Auto-approve for 30 min'
+  }
+  if ($null -ne $script:Auto60MenuItem) {
+    $script:Auto60MenuItem.Text = T 'trayAuto60' 'Auto-approve for 60 min'
+  }
+  if ($null -ne $script:StopAutoMenuItem) {
+    $script:StopAutoMenuItem.Text = T 'trayStopAuto' 'Stop auto-approve'
+  }
   if ($null -ne $script:NotifyIcon) {
     $script:NotifyIcon.Text = T 'trayTip' 'DSH Approval HUD'
   }
@@ -278,6 +313,7 @@ function Set-Labels {
   if ($null -ne $script:QuitMenuItem) {
     $script:QuitMenuItem.Text = T 'trayQuit' 'Quit approval window'
   }
+  Update-AutoApproveUi
 }
 
 function Invoke-HudApi {
@@ -510,10 +546,14 @@ function Show-Idle {
   if ($null -ne $script:CurrentConfig -and -not [string]::IsNullOrEmpty([string]$script:CurrentConfig.idleMode)) {
     $mode = [string]$script:CurrentConfig.idleMode
   }
-  if ($mode -eq 'compact') {
+  $autoActive = $null -ne $script:AutoApprove -and [bool]$script:AutoApprove.active
+  if ($mode -eq 'compact' -or $autoActive) {
     $card.Visibility = [System.Windows.Visibility]::Collapsed
     $idleBar.Visibility = [System.Windows.Visibility]::Visible
-    $idleText.Text = T 'idle' 'DSH Approval HUD - nothing pending'
+    if (-not $autoActive) {
+      $idleText.Text = T 'idle' 'DSH Approval HUD - nothing pending'
+      $idleStopButton.Visibility = [System.Windows.Visibility]::Collapsed
+    }
     Show-HudWindow
   } else {
     Hide-HudWindow
@@ -600,9 +640,16 @@ function Show-Item {
 
 function Update-Tray {
   param([int]$Count)
+  $autoActive = $null -ne $script:AutoApprove -and [bool]$script:AutoApprove.active
+  if ($null -ne $script:StopAutoMenuItem) {
+    $script:StopAutoMenuItem.Enabled = $autoActive
+  }
   if ($null -eq $script:NotifyIcon) { return }
   try {
-    if ($Count -gt 0) {
+    if ($autoActive) {
+      $clock = Format-Remaining ([int64]$script:AutoApprove.remainingMs)
+      $script:NotifyIcon.Text = (T 'trayTipAuto' 'DSH Approval HUD - auto-approving {0}') -f $clock
+    } elseif ($Count -gt 0) {
       $script:NotifyIcon.Text = (T 'trayTipPending' '{0} pending') -f $Count
     } else {
       $script:NotifyIcon.Text = T 'trayTip' 'DSH Approval HUD'
@@ -610,6 +657,122 @@ function Update-Tray {
   } catch {
     # NotifyIcon.Text is length-limited on some Windows versions.
   }
+}
+
+function Format-Remaining {
+  param([int64]$Ms)
+  if ($Ms -lt 0) { $Ms = 0 }
+  $total = [int][Math]::Floor($Ms / 1000)
+  $minutes = [int][Math]::Floor($total / 60)
+  $seconds = $total % 60
+  return ('{0:00}:{1:00}' -f $minutes, $seconds)
+}
+
+function Update-AutoApproveUi {
+  $active = $false
+  $remaining = [int64]0
+  $count = 0
+  if ($null -ne $script:AutoApprove) {
+    $active = [bool]$script:AutoApprove.active
+    $remaining = [int64]$script:AutoApprove.remainingMs
+    $count = [int]$script:AutoApprove.count
+  }
+  $clock = Format-Remaining $remaining
+
+  if ($active) {
+    $autoApproveButton.Content = (T 'autoStopWithTime' 'Stop - {0}') -f $clock
+    try { $autoApproveButton.Foreground = $window.FindResource('Warn') } catch { }
+    $idleStopButton.Content = (T 'autoStopWithTime' 'Stop - {0}') -f $clock
+    $idleStopButton.Visibility = [System.Windows.Visibility]::Visible
+    try { $idleStopButton.Foreground = $window.FindResource('Warn') } catch { }
+    try { $idleDot.Fill = $window.FindResource('Warn') } catch { }
+    $idleText.Text = (T 'autoIdle' 'Auto-approving - {0} - {1} approved') -f $clock, $count
+    $idleCountText.Text = ''
+  } else {
+    if ($null -ne $script:CurrentItem) {
+      $autoApproveButton.Content = (T 'autoStartAndAllow' 'Approve & auto-approve {0} min') -f $script:AutoMinutes
+    } else {
+      $autoApproveButton.Content = (T 'autoStart' 'Auto-approve {0} min') -f $script:AutoMinutes
+    }
+    try { $autoApproveButton.ClearValue([System.Windows.Controls.Control]::ForegroundProperty) } catch { }
+    $idleStopButton.Visibility = [System.Windows.Visibility]::Collapsed
+    try { $idleStopButton.ClearValue([System.Windows.Controls.Control]::ForegroundProperty) } catch { }
+    try { $idleDot.Fill = $script:IdleNormalBrush } catch { }
+    $idleText.Text = T 'idle' 'DSH Approval HUD - nothing pending'
+    $idleCountText.Text = ''
+  }
+
+  if ($null -ne $script:CurrentItem -and -not $script:Busy) {
+    $blocked = ''
+    if ($null -ne $script:CurrentItem.autoApproveBlocked) {
+      $blocked = [string]$script:CurrentItem.autoApproveBlocked
+    }
+    if ($blocked -eq 'dangerous') {
+      $statusText.Text = T 'autoBlockedDanger' 'Auto-approve is on, but this sensitive request needs you'
+    } elseif ($blocked -eq 'subagent') {
+      $statusText.Text = T 'autoBlockedSubagent' 'Auto-approve is on, but this subagent request needs you'
+    } elseif ($active) {
+      $statusText.Text = (T 'autoActive' 'Auto-approving - {0}') -f $clock
+    } else {
+      $statusText.Text = T 'waiting' 'Waiting for your approval'
+    }
+  }
+
+  Update-Tray $script:Pending.Count
+}
+
+function Start-AutoApprove {
+  param([int]$Minutes)
+  if ($script:Quitting) { return }
+  if ($Minutes -lt 1 -or $Minutes -gt 60) { $Minutes = $script:AutoMinutes }
+  if ($Minutes -lt 1) { $Minutes = 15 }
+
+  $body = @{ minutes = $Minutes } | ConvertTo-Json -Compress
+  $result = Invoke-HudApi -Method POST -Path '/auto-approve' -Body $body
+  Write-UiLog ('auto-approve start {0}: ok={1} status={2}' -f $Minutes, $result.Ok, $result.Status)
+  if (-not $result.Ok) {
+    $statusText.Text = T 'error' 'Cannot reach DSH, retrying'
+    return
+  }
+
+  $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  $until = [int64]0
+  try { $until = [int64]$result.Data.until } catch { $until = 0 }
+  if ($until -le 0) { $until = $now + ($Minutes * 60000) }
+  $script:AutoApprove = [pscustomobject]@{
+    active = $true
+    until = $until
+    remainingMs = [Math]::Max(0, $until - $now)
+    count = 0
+    last = $null
+  }
+  Update-AutoApproveUi
+
+  # The host resolves the current queue (except blocked entries); the next poll
+  # redraws either the idle countdown or the remaining manual request.
+  if ($null -eq $script:CurrentItem) {
+    Show-Idle
+    Update-AutoApproveUi
+  }
+}
+
+function Stop-AutoApprove {
+  if ($script:Quitting) { return }
+  $result = Invoke-HudApi -Method POST -Path '/auto-approve/stop' -Body '{}'
+  Write-UiLog ('auto-approve stop: ok={0} status={1}' -f $result.Ok, $result.Status)
+  if (-not $result.Ok) {
+    $statusText.Text = T 'error' 'Cannot reach DSH, retrying'
+    return
+  }
+  $script:AutoApprove = [pscustomobject]@{
+    active = $false
+    until = 0
+    remainingMs = 0
+    count = 0
+    last = $null
+  }
+  Update-AutoApproveUi
+  if ($null -eq $script:CurrentItem) { Show-Idle }
 }
 
 function Send-Ready {
@@ -698,6 +861,23 @@ function Poll {
       Set-Labels
     }
     $script:CurrentConfig = $config
+    if ($null -ne $config.autoApproveMinutes) {
+      $minutes = [int]$config.autoApproveMinutes
+      if ($minutes -ge 1 -and $minutes -le 60) { $script:AutoMinutes = $minutes }
+    }
+  }
+
+  $auto = $state.autoApprove
+  if ($null -ne $auto) {
+    $script:AutoApprove = [pscustomobject]@{
+      active = [bool]$auto.active
+      until = [int64]$auto.until
+      remainingMs = [int64]$auto.remainingMs
+      count = [int]$auto.count
+      last = $auto.last
+    }
+  } else {
+    $script:AutoApprove = $null
   }
 
   # Assigning an if-expression would unroll a one-element array into a scalar;
@@ -716,8 +896,16 @@ function Poll {
     $script:AutoTargetId = ''
     if ($script:Busy) { $script:Busy = $false }
     Set-ButtonsEnabled $true
-    Update-Tray 0
     Show-Idle
+    Update-AutoApproveUi
+    if ($script:RenderTo -ne '' -and -not $script:Rendered -and $idleBar.Visibility -eq [System.Windows.Visibility]::Visible) {
+      $script:Rendered = $true
+      Render-Current -Path $script:RenderTo
+      Write-UiLog ('rendered preview to {0}' -f $script:RenderTo)
+      Quit
+      return
+    }
+    Update-Tray 0
     return
   }
 
@@ -732,6 +920,7 @@ function Poll {
   }
   $script:CurrentItem = $item
   Show-Item -Item $item -Index 0 -Total $total -IsNew $isNew
+  Update-AutoApproveUi
   Update-Tray $total
 
   if ($script:RenderTo -ne '' -and -not $script:Rendered) {
@@ -796,6 +985,10 @@ function Quit {
 # A missing tray must not take the approval card down with it.
 $script:NotifyIcon = $null
 $script:ShowMenuItem = $null
+$script:Auto15MenuItem = $null
+$script:Auto30MenuItem = $null
+$script:Auto60MenuItem = $null
+$script:StopAutoMenuItem = $null
 $script:QuitMenuItem = $null
 try {
   $script:NotifyIcon = New-Object System.Windows.Forms.NotifyIcon
@@ -809,18 +1002,38 @@ try {
 
   $menu = New-Object System.Windows.Forms.ContextMenuStrip
   $script:ShowMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+  $script:Auto15MenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+  $script:Auto30MenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+  $script:Auto60MenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+  $script:StopAutoMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
   $script:QuitMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+  $separatorOne = New-Object System.Windows.Forms.ToolStripSeparator
+  $separatorTwo = New-Object System.Windows.Forms.ToolStripSeparator
   [void]$menu.Items.Add($script:ShowMenuItem)
+  [void]$menu.Items.Add($separatorOne)
+  [void]$menu.Items.Add($script:Auto15MenuItem)
+  [void]$menu.Items.Add($script:Auto30MenuItem)
+  [void]$menu.Items.Add($script:Auto60MenuItem)
+  [void]$menu.Items.Add($script:StopAutoMenuItem)
+  [void]$menu.Items.Add($separatorTwo)
   [void]$menu.Items.Add($script:QuitMenuItem)
   $script:NotifyIcon.ContextMenuStrip = $menu
   $script:NotifyIcon.add_DoubleClick({ Show-Current })
   $script:ShowMenuItem.add_Click({ Show-Current })
+  $script:Auto15MenuItem.add_Click({ Start-AutoApprove 15 })
+  $script:Auto30MenuItem.add_Click({ Start-AutoApprove 30 })
+  $script:Auto60MenuItem.add_Click({ Start-AutoApprove 60 })
+  $script:StopAutoMenuItem.add_Click({ Stop-AutoApprove })
   $script:QuitMenuItem.add_Click({ Quit })
   $script:NotifyIcon.Visible = $true
 } catch {
   Write-UiLog ('tray unavailable: ' + $_.Exception.Message)
   $script:NotifyIcon = $null
   $script:ShowMenuItem = $null
+  $script:Auto15MenuItem = $null
+  $script:Auto30MenuItem = $null
+  $script:Auto60MenuItem = $null
+  $script:StopAutoMenuItem = $null
   $script:QuitMenuItem = $null
 }
 
@@ -843,6 +1056,9 @@ $idleHeader.Add_MouseLeftButtonDown($dragHandler)
 $window.Add_Closing({
   param($sender, $eventArgs)
   if (-not $script:Quitting) {
+    if ($null -ne $script:AutoApprove -and [bool]$script:AutoApprove.active) {
+      Stop-AutoApprove
+    }
     $eventArgs.Cancel = $true
     Hide-HudWindow
   }
@@ -872,6 +1088,14 @@ $window.Add_PreviewKeyDown({
 $allowButton.Add_Click({ Send-Decision 'allow' })
 $rejectButton.Add_Click({ Send-Decision 'reject' })
 $delegateButton.Add_Click({ Send-Decision 'delegate' })
+$autoApproveButton.Add_Click({
+  if ($null -ne $script:AutoApprove -and [bool]$script:AutoApprove.active) {
+    Stop-AutoApprove
+  } else {
+    Start-AutoApprove $script:AutoMinutes
+  }
+})
+$idleStopButton.Add_Click({ Stop-AutoApprove })
 
 # --- Bootstrap ---------------------------------------------------------------
 $script:SavedPosition = Load-SavedPosition
@@ -894,6 +1118,9 @@ $script:Timer.Add_Tick({
 
 Write-UiLog ('ui starting pid={0} parent={1} port={2}' -f $PID, $ParentPid, $Port)
 [void](Send-Ready)
+if ($AutoStartMinutes -gt 0) {
+  Start-AutoApprove $AutoStartMinutes
+}
 $script:LastSuccess = [DateTime]::UtcNow
 $script:Timer.Start()
 $script:App.Run()

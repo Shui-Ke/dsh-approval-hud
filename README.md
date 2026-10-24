@@ -31,17 +31,17 @@ This plugin intercepts `approval/request` on the **host** side and renders each 
 A restart of the DSH process is required; refreshing the page is not enough.
 
 > Don't want to pack it yourself? Download:
-> [0.2.0 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.2.0.tgz) ·
-> [0.2.0 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.2.0.zip)
+> [0.3.0 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.0.tgz) ·
+> [0.3.0 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.0.zip)
 > The tgz is for the plugin manager; the zip bundles `install.bat`, the docs and the plugin.
 
 ### A. Plugin manager
 
-1. Keep the `dsh-approval-hud` folder or the packed `dsh-approval-hud-0.2.0.tgz`.
+1. Keep the `dsh-approval-hud` folder or the packed `dsh-approval-hud-0.3.0.tgz`.
 2. Open DSH's **Plugins** page.
 3. Add a plugin by absolute spec:
    - folder: `link:C:\path\to\dsh-approval-hud`
-   - tarball: `file:C:\path\to\dsh-approval-hud-0.2.0.tgz`
+   - tarball: `file:C:\path\to\dsh-approval-hud-0.3.0.tgz`
 4. Restart DSH. A shield icon appears in the tray.
 
 ### B. install.ps1 (most reliable)
@@ -84,6 +84,19 @@ Then restart DSH.
 
 When several requests are pending, the oldest is shown with `1 / N`; answering it reveals the next. Alt+F4 hides the window instead of dropping the request.
 
+## Timed auto-approve
+
+For stepping away without answering every prompt:
+
+- Right-click the tray icon → `Auto-approve 15 / 30 / 60 min`, or click `Approve & auto-approve 15 min` on the card.
+- It approves the current request (unless it is already held back), then auto-approves requests until the countdown ends. The card/idle strip and tray tooltip show the remaining time and the number auto-approved.
+- Stop from the card, the idle strip, the tray menu, or by closing the window. Closing the window, the UI exiting, or DSH restarting stops it automatically.
+- Dangerous patterns (`rm -rf`, `Remove-Item -Recurse -Force`, `format`, `shutdown`, `git push --force`, `DROP TABLE`, …) still open the card. The approval request carries no full argument list, so this is a heuristic, **not a security boundary**.
+- Subagent requests are not auto-approved by default (`autoApproveSubagents: false`).
+- Every auto-approval is appended to `%LOCALAPPDATA%\dsh-approval-hud\auto-approve.log`.
+
+> ⚠️ Auto-approve temporarily hands the approval decision to the program. Use it only for short periods, in sessions where you can accept the risk and have backups; avoid unattended destructive/production/secret work. It returns to one-by-one approval when the timer expires or you stop it.
+
 ## Configuration
 
 Override the plugin row in the profile's `cordis.patch.yml`. A patch replaces the whole `config` value, so list every key you want to keep:
@@ -98,13 +111,16 @@ Override the plugin row in the profile's `cordis.patch.yml`. A patch replaces th
     showProject: true
     followVirtualDesktop: true
     keepTopmost: true
+    autoApproveMinutes: 15
+    autoApproveSubagents: false
+    autoApproveDenyPatterns: []
     maxReasonChars: 600
     language: en             # zh | en
     startupTimeoutMs: 15000
     debug: false
 ```
 
-`enabled: false` restores the normal DSH approval card. `followVirtualDesktop` moves the card to the current Windows virtual desktop when you press `Win+Ctrl+←/→`; `keepTopmost` re-asserts HWND_TOPMOST while the card is visible. `debug: true` writes `plugin.log` and `ui.log` under `%LOCALAPPDATA%\dsh-approval-hud\`.
+`enabled: false` restores the normal DSH approval card. `followVirtualDesktop` moves the card to the current Windows virtual desktop when you press `Win+Ctrl+←/→`; `keepTopmost` re-asserts HWND_TOPMOST while the card is visible. `autoApproveMinutes` sets the card button's default duration (1–60); `autoApproveSubagents` includes subagent requests; `autoApproveDenyPatterns` adds extra dangerous-command regexes. `debug: true` writes `plugin.log` and `ui.log` under `%LOCALAPPDATA%\dsh-approval-hud\`.
 
 ## Fallback and safety
 
@@ -112,8 +128,10 @@ Override the plugin row in the profile's `cordis.patch.yml`. A patch replaces th
 - If the HUD is starting, failed, exited, or explicitly quit, the request is delegated to the next answerer unchanged.
 - Pending requests delegate back to DSH when the UI process exits; the plugin retries the UI at most three times.
 - Unloading the plugin or stopping DSH closes pending requests as `unavailable`; it never blocks forever.
-- The loopback server binds a random `127.0.0.1` port, requires a random token, rejects browser `Origin` requests, and never auto-approves.
-- Only one-shot grants exist; the plugin does not change DSH's approval policy.
+- The loopback server binds a random `127.0.0.1` port, requires a random token, and rejects browser `Origin` requests. The host sends the token to the UI over a private **stdin** pipe, so it does not appear in the UI process command line.
+- This is **not a security boundary**: the HUD and the agent still run as the same Windows user on the same desktop, so a same-user process with UI automation/debug rights can still click the window, read its memory, or inject. Use a separate Windows user/VM or a separate approval device when defending against a malicious agent.
+- It does not auto-approve by default. Only a manual, time-boxed auto-approve session does so, with a visible countdown, a stop control, a best-effort deny list, and a local audit log.
+- There is no permanent always-allow; after the timer expires or you stop it, the plugin returns to one-shot approvals and never changes DSH's approval policy.
 
 ## Limitations
 

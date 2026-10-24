@@ -31,17 +31,17 @@ DSH 默认把审批卡片放在对话输入框上方。窗口切走之后，agen
 安装后必须**重启 DSH 进程**（桌面版没有 HMR）；只刷新网页不够。
 
 > 不想自己打包？直接下载：
-> [0.2.0 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.2.0.tgz) ·
-> [0.2.0 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.2.0.zip)
+> [0.3.0 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.0.tgz) ·
+> [0.3.0 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.0.zip)
 > tgz 给插件管理器；zip 里带 `install.bat`、说明书和插件包。
 
 ### 方式 A：插件管理器
 
-1. 保留 `dsh-approval-hud` 文件夹，或已经打好的 `dsh-approval-hud-0.2.0.tgz`。
+1. 保留 `dsh-approval-hud` 文件夹，或已经打好的 `dsh-approval-hud-0.3.0.tgz`。
 2. 打开 DSH 的**插件**页面（侧边栏 → 插件，或设置 → 插件）。
 3. 添加插件，填绝对路径：
    - 文件夹：`link:C:\你的路径\dsh-approval-hud`
-   - 安装包：`file:C:\你的路径\dsh-approval-hud-0.2.0.tgz`
+   - 安装包：`file:C:\你的路径\dsh-approval-hud-0.3.0.tgz`
 4. 重启 DSH。
 5. 托盘出现盾牌图标，表示浮窗进程已启动。
 
@@ -98,6 +98,19 @@ dsh plugin --profile desktop add "link:C:\你的路径\dsh-approval-hud"
 - 关闭按钮（Alt+F4）只是隐藏窗口，托盘图标还在；审批不会丢。
 - 卡片默认在**空闲时隐藏**。想要一直显示一条小状态栏，把 `idleMode` 设为 `compact`。
 
+## 定时托管（离开电脑时用）
+
+需要暂时离开、又不想每条审批都回来点，可以开启**限时托管**：
+
+- **托盘图标右键** → `托管 15 / 30 / 60 分钟`；或卡片底部 `同意并托管 15 分钟`。
+- 开启后会先同意当前这条（如果它没有被打断），并在倒计时内自动同意后续审批；右下角/托盘会显示倒计时和已自动同意条数。
+- **停止**：卡片底部、空闲状态栏右侧、托盘菜单，或直接关闭浮窗；UI 退出、DSH 重启、窗口关闭都会自动停止托管。
+- **危险命令拦截**：`rm -rf`、`Remove-Item -Recurse -Force`、`format`、`shutdown`、`git push --force`、`DROP TABLE` 等模式不会自动同意，仍会弹卡片。请求里没有完整命令参数，这个拦截只是启发式，**不是安全边界**。
+- **子任务默认不自动同意**：`autoApproveSubagents` 为 `false` 时，子 agent 的审批仍会弹卡片；确认风险后可改为 `true`。
+- 每一次自动同意都会追加到 `%LOCALAPPDATA%\dsh-approval-hud\auto-approve.log`，方便回来核对。
+
+> ⚠️ **托管等于临时把审批权交给程序**。只建议在可接受风险、且有备份的会话里短时间使用；不要在涉及生产环境、密钥、重要数据的任务上长时间挂机。倒计时结束或你点停止后，会立即回到逐条审批。
+
 ## 配置
 
 在 profile 的 `cordis.patch.yml` 里覆盖插件行。**patch 的 `config` 是整体替换**，要保留的键请一起写：
@@ -112,6 +125,9 @@ dsh plugin --profile desktop add "link:C:\你的路径\dsh-approval-hud"
     showProject: true
     followVirtualDesktop: true
     keepTopmost: true
+    autoApproveMinutes: 15
+    autoApproveSubagents: false
+    autoApproveDenyPatterns: []
     maxReasonChars: 600
     language: zh             # zh | en
     startupTimeoutMs: 15000
@@ -127,6 +143,9 @@ dsh plugin --profile desktop add "link:C:\你的路径\dsh-approval-hud"
 | `showProject` | `true` | 在卡片上显示会话工作目录名 |
 | `followVirtualDesktop` | `true` | 跟随 Windows 虚拟桌面切换；窗口移到当前桌面 |
 | `keepTopmost` | `true` | 显示期间周期性重新置顶，避免被普通窗口盖住 |
+| `autoApproveMinutes` | `15` | 卡片“同意并托管”按钮的默认分钟数（1–60） |
+| `autoApproveSubagents` | `false` | 托管时是否也自动同意子 agent 的请求 |
+| `autoApproveDenyPatterns` | `[]` | 额外的危险命令正则；命中时仍弹卡片 |
 | `maxReasonChars` | `600` | 理由最多显示多少字符 |
 | `language` | `zh` | 卡片文案语言 |
 | `startupTimeoutMs` | `15000` | PowerShell 浮窗多久没就绪就回退到 DSH |
@@ -140,13 +159,14 @@ dsh plugin --profile desktop add "link:C:\你的路径\dsh-approval-hud"
 - 浮窗进程意外退出时，当前排队的审批会立即交回 DSH；插件最多自动重启 3 次。
 - 点击“在 DSH 中处理”只影响当前这一条，后续审批仍走浮窗。
 - 插件卸载或 DSH 退出时，未决审批以 `unavailable` 失败关闭，不会挂住进程。
-- 只支持一次性授权：没有“始终允许”，也不修改 DSH 的审批策略。
+- 没有永久的“始终允许”：只有手动开启的限时托管；托管结束/停止后回到逐条一次性授权，插件不修改 DSH 的审批策略。
 
 ## 安全
 
-- 浮窗通过 `127.0.0.1` 上的随机端口和随机 token 与 DSH 通信。
+- 浮窗通过 `127.0.0.1` 上的随机端口和随机 token 与 DSH 通信。token 由宿主通过 **stdin 私有管道**交给浮窗，不再出现在浮窗进程的命令行参数里，避免同用户进程直接扫到 token。
 - 服务只监听回环地址，拒绝带 `Origin` 的请求，写操作要求自定义 token 头，避免网页 CSRF。
-- 浮窗只显示 DSH 已经决定要审批的操作；它不会扩大权限，也不会自动批准。
+- 但这**不是安全边界**：浮窗和 agent 仍在同一个 Windows 用户/桌面，拥有 UI 自动化或调试权限的进程仍可能点浮窗、读内存或注入。需要防恶意 agent 时，请使用独立 Windows 用户/VM 或另一台设备审批。
+- 浮窗只显示 DSH 已经决定要审批的操作；它不会扩大权限。默认不会自动批准；只有你手动开启限时托管时，才会在倒计时内自动同意，并写入本地审计日志。
 - 审批理由来自模型/工具，作为纯文本显示，不解析 HTML。
 
 ## 排查

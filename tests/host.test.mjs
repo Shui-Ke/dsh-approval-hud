@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { request } from 'node:http'
+import { join } from 'node:path'
 import { test } from 'node:test'
 
 import {
@@ -28,9 +30,16 @@ function fakeContext() {
 /** Fake PowerShell child process. */
 function fakeChild() {
   const callbacks = new Map()
+  const stdin = {
+    writes: [],
+    ended: false,
+    write(chunk) { this.writes.push(String(chunk)) },
+    end() { this.ended = true },
+  }
   return {
     pid: 4242,
     killed: false,
+    stdin,
     stdout: { on() {} },
     stderr: { on() {} },
     on(event, callback) {
@@ -92,18 +101,36 @@ function approval(overrides = {}) {
   }
 }
 
+/** Build a root (non-subagent) approval request. */
+function rootApproval(overrides = {}) {
+  return approval({
+    agent: {
+      session: {
+        id: 'session-root123456',
+        header: { cwd: 'C:\\work\\demo' },
+      },
+    },
+    ...overrides,
+  })
+}
+
 /** Start a HUD with a fake UI and mark it ready. */
 async function startHud(options = {}) {
   const ctx = fakeContext()
   const child = fakeChild()
+  const spawnCalls = []
   const config = normalizeConfig({ debug: false, ...options })
   const hud = new ApprovalHud(ctx, config, {
     platform: 'win32',
-    spawnUi: () => child,
+    spawnUi: (command, args, options_) => {
+      spawnCalls.push({ command, args, options: options_ })
+      return child
+    },
+    auditDir: join(process.cwd(), 'tests', '.tmp-audit'),
   })
   await hud.serverPromise
   hud.markReady()
-  return { ctx, child, hud }
+  return { ctx, child, hud, spawnCalls }
 }
 
 test('normalizeConfig clamps invalid values', () => {
@@ -114,6 +141,9 @@ test('normalizeConfig clamps invalid values', () => {
     maxReasonChars: 1,
     startupTimeoutMs: 1,
     sound: 0,
+    autoApproveMinutes: 0,
+    autoApproveSubagents: 0,
+    autoApproveDenyPatterns: ['x', 3, 'y'],
   })
   assert.equal(config.position, 'bottom-right')
   assert.equal(config.idleMode, 'hide')
@@ -123,6 +153,9 @@ test('normalizeConfig clamps invalid values', () => {
   assert.equal(config.sound, false)
   assert.equal(config.followVirtualDesktop, true)
   assert.equal(config.keepTopmost, true)
+  assert.equal(config.autoApproveMinutes, 1)
+  assert.equal(config.autoApproveSubagents, false)
+  assert.deepEqual(config.autoApproveDenyPatterns, ['x', 'y'])
 })
 
 test('cleanText collapses and truncates long reasons', () => {
@@ -267,6 +300,20 @@ test('a UI exit delegates pending requests', async () => {
   }
 })
 
+test('the UI token arrives over stdin, never on the command line', async () => {
+  const { hud, child, spawnCalls } = await startHud()
+  try {
+    assert.equal(spawnCalls.length, 1)
+    assert.equal(spawnCalls[0].args.includes('-Token'), false)
+    assert.equal(spawnCalls[0].args.includes(hud.token), false)
+    assert.equal(spawnCalls[0].options.stdio[0], 'pipe')
+    assert.deepEqual(child.stdin.writes, [`${hud.token}\n`])
+    assert.equal(child.stdin.ended, true)
+  } finally {
+    hud.dispose()
+  }
+})
+
 test('the loopback API requires the token and rejects browser origins', async () => {
   const { hud } = await startHud()
   try {
@@ -343,6 +390,145 @@ test('two pending requests are answered in arrival order', async () => {
       body: { id: next.body.pending[0].id, decision: 'reject' },
     })
     assert.equal(await secondOutcome, 'rejected')
+  } finally {
+    hud.dispose()
+  }
+})
+
+test('timed auto-approve answers without showing a card and audits it', async () => {
+  const { hud } = await startHud()
+  try {
+    const start = await call(hud.port, '/auto-approve', {
+      method: 'POST',
+      token: hud.token,
+      body: { minutes: 5 },
+    })
+    assert.equal(start.status, 200)
+    assert.equal(start.body.ok, true)
+    const { request: req } = rootApproval()
+    const outcome = await hud.handle(req, async () => 'unavailable')
+    assert.equal(outcome, 'allowed-once')
+    const state = await call(hud.port, `/state?token=${hud.token}`, { token: hud.token })
+    assert.equal(state.body.pending.length, 0)
+    assert.equal(state.body.autoApprove.active, true)
+    assert.equal(state.body.autoApprove.count, 1)
+    assert.ok(state.body.autoApprove.remainingMs > 0)
+    const log = readFileSync(join(process.cwd(), 'tests', '.tmp-audit', 'auto-approve.log'), 'utf8')
+    assert.match(log, /"toolName":"pwsh"/)
+  } finally {
+    hud.dispose()
+  }
+})
+
+test('starting auto-approve resolves the already queued request', async () => {
+  const { hud } = await startHud()
+  try {
+    const { request: req } = rootApproval()
+    const outcome = hud.handle(req, async () => 'unavailable')
+    const start = await call(hud.port, '/auto-approve', {
+      method: 'POST',
+      token: hud.token,
+      body: { minutes: 5 },
+    })
+    assert.equal(start.status, 200)
+    assert.equal(await outcome, 'allowed-once')
+    const state = await call(hud.port, `/state?token=${hud.token}`, { token: hud.token })
+    assert.equal(state.body.pending.length, 0)
+    assert.equal(state.body.autoApprove.count, 1)
+  } finally {
+    hud.dispose()
+  }
+})
+
+test('dangerous commands still require a manual decision during auto-approve', async () => {
+  const { hud } = await startHud()
+  try {
+    await call(hud.port, '/auto-approve', {
+      method: 'POST',
+      token: hud.token,
+      body: { minutes: 5 },
+    })
+    const { request: req } = rootApproval({ reason: 'Need to run rm -rf / now' })
+    const outcome = hud.handle(req, async () => 'unavailable')
+    const state = await call(hud.port, `/state?token=${hud.token}`, { token: hud.token })
+    assert.equal(state.body.pending.length, 1)
+    assert.equal(state.body.pending[0].autoApproveBlocked, 'dangerous')
+    await call(hud.port, '/answer', {
+      method: 'POST',
+      token: hud.token,
+      body: { id: state.body.pending[0].id, decision: 'reject' },
+    })
+    assert.equal(await outcome, 'rejected')
+  } finally {
+    hud.dispose()
+  }
+})
+
+test('subagent requests are not auto-approved by default', async () => {
+  const { hud } = await startHud()
+  try {
+    await call(hud.port, '/auto-approve', {
+      method: 'POST',
+      token: hud.token,
+      body: { minutes: 5 },
+    })
+    const { request: req } = approval()
+    const outcome = hud.handle(req, async () => 'unavailable')
+    const state = await call(hud.port, `/state?token=${hud.token}`, { token: hud.token })
+    assert.equal(state.body.pending.length, 1)
+    assert.equal(state.body.pending[0].autoApproveBlocked, 'subagent')
+    await call(hud.port, '/answer', {
+      method: 'POST',
+      token: hud.token,
+      body: { id: state.body.pending[0].id, decision: 'allow' },
+    })
+    assert.equal(await outcome, 'allowed-once')
+  } finally {
+    hud.dispose()
+  }
+})
+
+test('stopping auto-approve restores manual decisions', async () => {
+  const { hud } = await startHud()
+  try {
+    await call(hud.port, '/auto-approve', {
+      method: 'POST',
+      token: hud.token,
+      body: { minutes: 5 },
+    })
+    const stop = await call(hud.port, '/auto-approve/stop', {
+      method: 'POST',
+      token: hud.token,
+      body: {},
+    })
+    assert.equal(stop.status, 200)
+    const { request: req } = rootApproval()
+    const outcome = hud.handle(req, async () => 'unavailable')
+    const state = await call(hud.port, `/state?token=${hud.token}`, { token: hud.token })
+    assert.equal(state.body.autoApprove.active, false)
+    assert.equal(state.body.pending.length, 1)
+    await call(hud.port, '/answer', {
+      method: 'POST',
+      token: hud.token,
+      body: { id: state.body.pending[0].id, decision: 'reject' },
+    })
+    assert.equal(await outcome, 'rejected')
+  } finally {
+    hud.dispose()
+  }
+})
+
+test('auto-approve stops when the UI exits', async () => {
+  const { hud, child } = await startHud()
+  try {
+    await call(hud.port, '/auto-approve', {
+      method: 'POST',
+      token: hud.token,
+      body: { minutes: 5 },
+    })
+    child.emit('exit', 0, null)
+    const state = await call(hud.port, `/state?token=${hud.token}`, { token: hud.token })
+    assert.equal(state.body.autoApprove.active, false)
   } finally {
     hud.dispose()
   }

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0 — 2026-10-24
+
+- Add timed auto-approve: tray 15/30/60 minutes, or "Approve & auto-approve" on the card.
+- One click approves the already queued requests and the following ones while the countdown runs.
+- Security: the UI token now arrives over a private stdin pipe and no longer appears in the UI process command line.
+- Security: README states the HUD is a same-user guardrail, not a boundary against UI automation/memory access.
+- Visible countdown on the card/idle strip and in the tray tooltip, with stop from all three.
+- Auto-approve stops on timer expiry, window close, UI exit, DSH quit, or DSH restart.
+- Best-effort deny list for catastrophic commands; blocked requests still open the card.
+- Subagent requests are not auto-approved by default (`autoApproveSubagents: false`).
+- Every auto-approval is appended to `%LOCALAPPDATA%\dsh-approval-hud\auto-approve.log`.
+- Config: `autoApproveMinutes`, `autoApproveSubagents`, `autoApproveDenyPatterns`.
+
 ## 0.2.0 — 2026-10-22
 
 - Follow Windows virtual-desktop switches: the card moves to the current desktop within about one second.
