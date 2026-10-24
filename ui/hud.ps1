@@ -162,6 +162,22 @@ namespace DshApprovalHud {
         return false;
       }
     }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern uint SetThreadExecutionState(uint esFlags);
+
+    private const uint EsContinuous = 0x80000000u;
+    private const uint EsSystemRequired = 0x00000001u;
+    private const uint EsDisplayRequired = 0x00000002u;
+
+    public static bool SetKeepAwake(bool enabled) {
+      try {
+        uint flags = EsContinuous | (enabled ? (EsSystemRequired | EsDisplayRequired) : 0u);
+        return SetThreadExecutionState(flags) != 0;
+      } catch {
+        return false;
+      }
+    }
   }
 }
 '@
@@ -280,6 +296,8 @@ $script:LastDesktopAttempt = [DateTime]::MinValue
 $script:LastDesktopFailureLog = [DateTime]::MinValue
 $script:AutoApprove = $null
 $script:AutoMinutes = 15
+$script:AutoOptions = @(15, 30, 60)
+$script:KeepAwake = $false
 $script:IdleNormalBrush = $idleDot.Fill
 
 function Set-Labels {
@@ -292,14 +310,18 @@ function Set-Labels {
   $subagentText.Text = T 'subagent' 'subagent'
   $autoApproveButton.ToolTip = T 'autoStartTip' 'Automatically approve requests for the selected time'
   $idleStopButton.Content = T 'autoStop' 'Stop auto-approve'
-  if ($null -ne $script:Auto15MenuItem) {
-    $script:Auto15MenuItem.Text = T 'trayAuto15' 'Auto-approve for 15 min'
-  }
-  if ($null -ne $script:Auto30MenuItem) {
-    $script:Auto30MenuItem.Text = T 'trayAuto30' 'Auto-approve for 30 min'
-  }
-  if ($null -ne $script:Auto60MenuItem) {
-    $script:Auto60MenuItem.Text = T 'trayAuto60' 'Auto-approve for 60 min'
+  $autoItems = @($script:Auto15MenuItem, $script:Auto30MenuItem, $script:Auto60MenuItem)
+  for ($i = 0; $i -lt $autoItems.Count; $i++) {
+    $autoItem = $autoItems[$i]
+    if ($null -eq $autoItem) { continue }
+    if ($i -lt $script:AutoOptions.Count) {
+      $minutes = [int]$script:AutoOptions[$i]
+      $autoItem.Text = (T 'trayAutoMinutes' 'Auto-approve for {0} min') -f $minutes
+      $autoItem.Tag = $minutes
+      $autoItem.Visible = $true
+    } else {
+      $autoItem.Visible = $false
+    }
   }
   if ($null -ne $script:StopAutoMenuItem) {
     $script:StopAutoMenuItem.Text = T 'trayStopAuto' 'Stop auto-approve'
@@ -702,6 +724,28 @@ function Update-AutoApproveUi {
     $idleCountText.Text = ''
   }
 
+  $keepAwake = $true
+  if ($null -ne $script:CurrentConfig -and $null -ne $script:CurrentConfig.keepAwakeDuringAutoApprove) {
+    $keepAwake = [bool]$script:CurrentConfig.keepAwakeDuringAutoApprove
+  }
+  if ($active -and $keepAwake) {
+    if (-not $script:KeepAwake) {
+      try {
+        $keepResult = [DshApprovalHud.Native]::SetKeepAwake($true)
+        $script:KeepAwake = $true
+        Write-UiLog ('keep-awake on result=' + $keepResult)
+      } catch {
+        Write-UiLog ('keep-awake on failed: ' + $_.Exception.Message)
+      }
+    }
+  } elseif ($script:KeepAwake) {
+    try {
+      $keepResult = [DshApprovalHud.Native]::SetKeepAwake($false)
+      Write-UiLog ('keep-awake off result=' + $keepResult)
+    } catch { }
+    $script:KeepAwake = $false
+  }
+
   if ($null -ne $script:CurrentItem -and -not $script:Busy) {
     $blocked = ''
     if ($null -ne $script:CurrentItem.autoApproveBlocked) {
@@ -724,7 +768,7 @@ function Update-AutoApproveUi {
 function Start-AutoApprove {
   param([int]$Minutes)
   if ($script:Quitting) { return }
-  if ($Minutes -lt 1 -or $Minutes -gt 60) { $Minutes = $script:AutoMinutes }
+  if ($Minutes -lt 1 -or $Minutes -gt 480) { $Minutes = $script:AutoMinutes }
   if ($Minutes -lt 1) { $Minutes = 15 }
 
   $body = @{ minutes = $Minutes } | ConvertTo-Json -Compress
@@ -863,7 +907,19 @@ function Poll {
     $script:CurrentConfig = $config
     if ($null -ne $config.autoApproveMinutes) {
       $minutes = [int]$config.autoApproveMinutes
-      if ($minutes -ge 1 -and $minutes -le 60) { $script:AutoMinutes = $minutes }
+      if ($minutes -ge 1 -and $minutes -le 480) { $script:AutoMinutes = $minutes }
+    }
+    $options = @()
+    foreach ($value in @($config.autoApproveOptions)) {
+      $option = [int]$value
+      if ($option -ge 1 -and $option -le 480) { $options += $option }
+    }
+    if ($options.Count -gt 0) {
+      $options = @($options | Select-Object -Unique | Select-Object -First 3)
+      if (($options -join ',') -ne ($script:AutoOptions -join ',')) {
+        $script:AutoOptions = $options
+        Set-Labels
+      }
     }
   }
 
@@ -975,6 +1031,10 @@ function Quit {
   if ($script:Quitting) { return }
   $script:Quitting = $true
   try { $script:Timer.Stop() } catch { }
+  if ($script:KeepAwake) {
+    try { [void][DshApprovalHud.Native]::SetKeepAwake($false) } catch { }
+    $script:KeepAwake = $false
+  }
   try { [void](Invoke-HudApi -Method POST -Path '/bye' -Body '{}') } catch { }
   try { if ($null -ne $script:NotifyIcon) { $script:NotifyIcon.Visible = $false; $script:NotifyIcon.Dispose() } } catch { }
   try { $window.Hide() } catch { }
@@ -1020,9 +1080,9 @@ try {
   $script:NotifyIcon.ContextMenuStrip = $menu
   $script:NotifyIcon.add_DoubleClick({ Show-Current })
   $script:ShowMenuItem.add_Click({ Show-Current })
-  $script:Auto15MenuItem.add_Click({ Start-AutoApprove 15 })
-  $script:Auto30MenuItem.add_Click({ Start-AutoApprove 30 })
-  $script:Auto60MenuItem.add_Click({ Start-AutoApprove 60 })
+  $script:Auto15MenuItem.add_Click({ Start-AutoApprove ([int]$script:Auto15MenuItem.Tag) })
+  $script:Auto30MenuItem.add_Click({ Start-AutoApprove ([int]$script:Auto30MenuItem.Tag) })
+  $script:Auto60MenuItem.add_Click({ Start-AutoApprove ([int]$script:Auto60MenuItem.Tag) })
   $script:StopAutoMenuItem.add_Click({ Stop-AutoApprove })
   $script:QuitMenuItem.add_Click({ Quit })
   $script:NotifyIcon.Visible = $true

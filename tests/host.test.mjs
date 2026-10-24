@@ -142,6 +142,8 @@ test('normalizeConfig clamps invalid values', () => {
     startupTimeoutMs: 1,
     sound: 0,
     autoApproveMinutes: 0,
+    autoApproveOptions: [10, 10, 0, 500, 'x', 30],
+    keepAwakeDuringAutoApprove: 0,
     autoApproveSubagents: 0,
     autoApproveDenyPatterns: ['x', 3, 'y'],
   })
@@ -154,6 +156,8 @@ test('normalizeConfig clamps invalid values', () => {
   assert.equal(config.followVirtualDesktop, true)
   assert.equal(config.keepTopmost, true)
   assert.equal(config.autoApproveMinutes, 1)
+  assert.deepEqual(config.autoApproveOptions, [10, 30])
+  assert.equal(config.keepAwakeDuringAutoApprove, false)
   assert.equal(config.autoApproveSubagents, false)
   assert.deepEqual(config.autoApproveDenyPatterns, ['x', 'y'])
 })

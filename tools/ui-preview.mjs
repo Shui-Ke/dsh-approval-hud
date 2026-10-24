@@ -58,6 +58,8 @@ const server = createServer((req, res) => {
         followVirtualDesktop: true,
         keepTopmost: true,
         autoApproveMinutes: 15,
+        autoApproveOptions: [15, 30, 60],
+        keepAwakeDuringAutoApprove: true,
         autoApproveSubagents: false,
         language: 'zh',
       },

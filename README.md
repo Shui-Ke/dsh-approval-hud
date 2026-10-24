@@ -31,17 +31,17 @@ This plugin intercepts `approval/request` on the **host** side and renders each 
 A restart of the DSH process is required; refreshing the page is not enough.
 
 > Don't want to pack it yourself? Download:
-> [0.3.0 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.0.tgz) ·
-> [0.3.0 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.0.zip)
+> [0.3.1 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.1.tgz) ·
+> [0.3.1 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.1.zip)
 > The tgz is for the plugin manager; the zip bundles `install.bat`, the docs and the plugin.
 
 ### A. Plugin manager
 
-1. Keep the `dsh-approval-hud` folder or the packed `dsh-approval-hud-0.3.0.tgz`.
+1. Keep the `dsh-approval-hud` folder or the packed `dsh-approval-hud-0.3.1.tgz`.
 2. Open DSH's **Plugins** page.
 3. Add a plugin by absolute spec:
    - folder: `link:C:\path\to\dsh-approval-hud`
-   - tarball: `file:C:\path\to\dsh-approval-hud-0.3.0.tgz`
+   - tarball: `file:C:\path\to\dsh-approval-hud-0.3.1.tgz`
 4. Restart DSH. A shield icon appears in the tray.
 
 ### B. install.ps1 (most reliable)
@@ -88,14 +88,16 @@ When several requests are pending, the oldest is shown with `1 / N`; answering i
 
 For stepping away without answering every prompt:
 
-- Right-click the tray icon → `Auto-approve 15 / 30 / 60 min`, or click `Approve & auto-approve 15 min` on the card.
-- It approves the current request (unless it is already held back), then auto-approves requests until the countdown ends. The card/idle strip and tray tooltip show the remaining time and the number auto-approved.
+- Right-click the tray icon → `Auto-approve 15 / 30 / 60 min` (customise with `autoApproveOptions`, up to three values, each 1–480), or click `Approve & auto-approve {autoApproveMinutes} min` on the card.
+- It approves the current queue (except held-back entries), then auto-approves requests until the countdown ends. The card/idle strip and tray tooltip show the remaining time and the number auto-approved.
+- Extend by choosing another tray duration; it restarts the countdown from now. Each request can be up to 480 minutes.
+- **Keep awake**: while auto-approve is active it calls `SetThreadExecutionState` to block idle sleep and display-off, then restores on stop/expiry/window close/UI exit. Lid close, manual sleep, or group-policy power settings can still override it.
 - Stop from the card, the idle strip, the tray menu, or by closing the window. Closing the window, the UI exiting, or DSH restarting stops it automatically.
 - Dangerous patterns (`rm -rf`, `Remove-Item -Recurse -Force`, `format`, `shutdown`, `git push --force`, `DROP TABLE`, …) still open the card. The approval request carries no full argument list, so this is a heuristic, **not a security boundary**.
 - Subagent requests are not auto-approved by default (`autoApproveSubagents: false`).
 - Every auto-approval is appended to `%LOCALAPPDATA%\dsh-approval-hud\auto-approve.log`.
 
-> ⚠️ Auto-approve temporarily hands the approval decision to the program. Use it only for short periods, in sessions where you can accept the risk and have backups; avoid unattended destructive/production/secret work. It returns to one-by-one approval when the timer expires or you stop it.
+> ⚠️ Auto-approve temporarily hands the approval decision to the program. Use it only for limited periods, in sessions where you can accept the risk and have backups; avoid unattended destructive/production/secret work. It returns to one-by-one approval when the timer expires or you stop it.
 
 ## Configuration
 
@@ -112,6 +114,8 @@ Override the plugin row in the profile's `cordis.patch.yml`. A patch replaces th
     followVirtualDesktop: true
     keepTopmost: true
     autoApproveMinutes: 15
+    autoApproveOptions: [15, 30, 60]
+    keepAwakeDuringAutoApprove: true
     autoApproveSubagents: false
     autoApproveDenyPatterns: []
     maxReasonChars: 600
@@ -120,7 +124,7 @@ Override the plugin row in the profile's `cordis.patch.yml`. A patch replaces th
     debug: false
 ```
 
-`enabled: false` restores the normal DSH approval card. `followVirtualDesktop` moves the card to the current Windows virtual desktop when you press `Win+Ctrl+←/→`; `keepTopmost` re-asserts HWND_TOPMOST while the card is visible. `autoApproveMinutes` sets the card button's default duration (1–60); `autoApproveSubagents` includes subagent requests; `autoApproveDenyPatterns` adds extra dangerous-command regexes. `debug: true` writes `plugin.log` and `ui.log` under `%LOCALAPPDATA%\dsh-approval-hud\`.
+`enabled: false` restores the normal DSH approval card. `followVirtualDesktop` moves the card to the current Windows virtual desktop when you press `Win+Ctrl+←/→`; `keepTopmost` re-asserts HWND_TOPMOST while the card is visible. `autoApproveMinutes` sets the card button's default duration (1–480); `autoApproveOptions` sets the tray choices (up to three, 1–480); `keepAwakeDuringAutoApprove` blocks idle sleep/display-off while auto-approve is active; `autoApproveSubagents` includes subagent requests; `autoApproveDenyPatterns` adds extra dangerous-command regexes. `debug: true` writes `plugin.log` and `ui.log` under `%LOCALAPPDATA%\dsh-approval-hud\`.
 
 ## Fallback and safety
 

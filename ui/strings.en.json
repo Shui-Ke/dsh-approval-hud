@@ -22,6 +22,7 @@
   "trayAuto15": "Auto-approve for 15 min",
   "trayAuto30": "Auto-approve for 30 min",
   "trayAuto60": "Auto-approve for 60 min",
+  "trayAutoMinutes": "Auto-approve for {0} min",
   "trayStopAuto": "Stop auto-approve",
   "autoStart": "Auto-approve {0} min",
   "autoStartAndAllow": "Approve & auto-approve {0} min",

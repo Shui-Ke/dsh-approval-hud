@@ -22,6 +22,7 @@
   "trayAuto15": "托管 15 分钟（自动同意）",
   "trayAuto30": "托管 30 分钟（自动同意）",
   "trayAuto60": "托管 60 分钟（自动同意）",
+  "trayAutoMinutes": "托管 {0} 分钟（自动同意）",
   "trayStopAuto": "停止托管",
   "autoStart": "托管 {0} 分钟",
   "autoStartAndAllow": "同意并托管 {0} 分钟",

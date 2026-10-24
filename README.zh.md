@@ -31,17 +31,17 @@ DSH 默认把审批卡片放在对话输入框上方。窗口切走之后，agen
 安装后必须**重启 DSH 进程**（桌面版没有 HMR）；只刷新网页不够。
 
 > 不想自己打包？直接下载：
-> [0.3.0 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.0.tgz) ·
-> [0.3.0 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.0.zip)
+> [0.3.1 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.1.tgz) ·
+> [0.3.1 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.1.zip)
 > tgz 给插件管理器；zip 里带 `install.bat`、说明书和插件包。
 
 ### 方式 A：插件管理器
 
-1. 保留 `dsh-approval-hud` 文件夹，或已经打好的 `dsh-approval-hud-0.3.0.tgz`。
+1. 保留 `dsh-approval-hud` 文件夹，或已经打好的 `dsh-approval-hud-0.3.1.tgz`。
 2. 打开 DSH 的**插件**页面（侧边栏 → 插件，或设置 → 插件）。
 3. 添加插件，填绝对路径：
    - 文件夹：`link:C:\你的路径\dsh-approval-hud`
-   - 安装包：`file:C:\你的路径\dsh-approval-hud-0.3.0.tgz`
+   - 安装包：`file:C:\你的路径\dsh-approval-hud-0.3.1.tgz`
 4. 重启 DSH。
 5. 托盘出现盾牌图标，表示浮窗进程已启动。
 
@@ -102,14 +102,16 @@ dsh plugin --profile desktop add "link:C:\你的路径\dsh-approval-hud"
 
 需要暂时离开、又不想每条审批都回来点，可以开启**限时托管**：
 
-- **托盘图标右键** → `托管 15 / 30 / 60 分钟`；或卡片底部 `同意并托管 15 分钟`。
-- 开启后会先同意当前这条（如果它没有被打断），并在倒计时内自动同意后续审批；右下角/托盘会显示倒计时和已自动同意条数。
+- **托盘图标右键** → `托管 15 / 30 / 60 分钟`（可用 `autoApproveOptions` 改成最多 3 个自定义时长，单个 1–480 分钟）；或卡片底部 `同意并托管 {autoApproveMinutes} 分钟`。
+- 开启后会先同意当前队列里能自动同意的请求，并在倒计时内自动同意后续审批；右下角/托盘会显示倒计时和已自动同意条数。
+- **续期**：托管期间再点托盘里的另一个时长，会从当前时间重新计时；每次请求最多 480 分钟。
+- **保持唤醒**：托管期间默认调用 `SetThreadExecutionState` 阻止空闲睡眠和息屏；停止、到期、关闭浮窗或 UI 退出后自动恢复。合盖、手动睡眠、组策略/电源计划强制睡眠仍可能覆盖它。
 - **停止**：卡片底部、空闲状态栏右侧、托盘菜单，或直接关闭浮窗；UI 退出、DSH 重启、窗口关闭都会自动停止托管。
 - **危险命令拦截**：`rm -rf`、`Remove-Item -Recurse -Force`、`format`、`shutdown`、`git push --force`、`DROP TABLE` 等模式不会自动同意，仍会弹卡片。请求里没有完整命令参数，这个拦截只是启发式，**不是安全边界**。
 - **子任务默认不自动同意**：`autoApproveSubagents` 为 `false` 时，子 agent 的审批仍会弹卡片；确认风险后可改为 `true`。
 - 每一次自动同意都会追加到 `%LOCALAPPDATA%\dsh-approval-hud\auto-approve.log`，方便回来核对。
 
-> ⚠️ **托管等于临时把审批权交给程序**。只建议在可接受风险、且有备份的会话里短时间使用；不要在涉及生产环境、密钥、重要数据的任务上长时间挂机。倒计时结束或你点停止后，会立即回到逐条审批。
+> ⚠️ **托管等于临时把审批权交给程序**。只建议在可接受风险、且有备份的会话里有限时间使用；不要在涉及生产环境、密钥、重要数据的任务上长时间挂机。倒计时结束或你点停止后，会立即回到逐条审批。
 
 ## 配置
 
@@ -126,6 +128,8 @@ dsh plugin --profile desktop add "link:C:\你的路径\dsh-approval-hud"
     followVirtualDesktop: true
     keepTopmost: true
     autoApproveMinutes: 15
+    autoApproveOptions: [15, 30, 60]
+    keepAwakeDuringAutoApprove: true
     autoApproveSubagents: false
     autoApproveDenyPatterns: []
     maxReasonChars: 600
@@ -143,7 +147,9 @@ dsh plugin --profile desktop add "link:C:\你的路径\dsh-approval-hud"
 | `showProject` | `true` | 在卡片上显示会话工作目录名 |
 | `followVirtualDesktop` | `true` | 跟随 Windows 虚拟桌面切换；窗口移到当前桌面 |
 | `keepTopmost` | `true` | 显示期间周期性重新置顶，避免被普通窗口盖住 |
-| `autoApproveMinutes` | `15` | 卡片“同意并托管”按钮的默认分钟数（1–60） |
+| `autoApproveMinutes` | `15` | 卡片“同意并托管”按钮的默认分钟数（1–480） |
+| `autoApproveOptions` | `[15, 30, 60]` | 托盘里的托管制选项，最多 3 个，单个 1–480 |
+| `keepAwakeDuringAutoApprove` | `true` | 托管期间阻止空闲睡眠/息屏；结束自动恢复 |
 | `autoApproveSubagents` | `false` | 托管时是否也自动同意子 agent 的请求 |
 | `autoApproveDenyPatterns` | `[]` | 额外的危险命令正则；命中时仍弹卡片 |
 | `maxReasonChars` | `600` | 理由最多显示多少字符 |

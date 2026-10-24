@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 — 2026-10-24
+
+- Auto-approve durations are configurable: `autoApproveMinutes` (card, 1–480) and `autoApproveOptions` (tray, up to three values).
+- Choosing another tray duration extends the countdown from the current time.
+- Keep the system awake and the display on while auto-approve is active (`keepAwakeDuringAutoApprove`, default `true`), restoring normal power behaviour on stop/expiry/window close/UI exit.
+- Document that manual sleep, lid close, or group-policy power settings can still override the request.
+
 ## 0.3.0 — 2026-10-24
 
 - Add timed auto-approve: tray 15/30/60 minutes, or "Approve & auto-approve" on the card.
