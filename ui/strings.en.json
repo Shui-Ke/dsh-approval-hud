@@ -15,6 +15,8 @@
   "footer": "Enter allow · Esc reject · this request only",
   "idle": "DSH Approval HUD · nothing pending",
   "trayShow": "Show approval window",
+  "trayAllow": "Allow current request",
+  "trayReject": "Reject current request",
   "trayQuit": "Quit approval window",
   "trayTip": "DSH Approval HUD",
   "trayTipPending": "DSH Approval HUD · {0} pending",

@@ -4,3 +4,5 @@ d4eaac1b858bf131c2a5856fe4d5e59fcc1cd9ca001f2a9b7d7d785bf7a6ccad  dsh-approval-h
 05dd09232d261109c64a15d8ca20bfa1b0468cd9b39854ccd551ca654430269a  dsh-approval-hud-0.3.0.zip
 1bd5b8c45d9efb09e204775365c2e9bf22c63b0fa17c899b17dd301067f6dd14  dsh-approval-hud-0.3.1.tgz
 8df453979670bada21bcd2a4fbd87bdd5c02807de3eb1ccc77f4d71e32c8936b  dsh-approval-hud-0.3.1.zip
+3dd17695cda669e199264d11146cb027eaa4e3a50869f55e9cb44e84f188f63d  dsh-approval-hud-0.3.2.tgz
+078217d57372b762d613183b8a50fc1b29c29d5889ed5d20a2f5ea9366c22aed  dsh-approval-hud-0.3.2.zip

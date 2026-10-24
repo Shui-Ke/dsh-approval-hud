@@ -31,17 +31,17 @@ This plugin intercepts `approval/request` on the **host** side and renders each 
 A restart of the DSH process is required; refreshing the page is not enough.
 
 > Don't want to pack it yourself? Download:
-> [0.3.1 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.1.tgz) ·
-> [0.3.1 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.1.zip)
+> [0.3.2 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.2.tgz) ·
+> [0.3.2 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.2.zip)
 > The tgz is for the plugin manager; the zip bundles `install.bat`, the docs and the plugin.
 
 ### A. Plugin manager
 
-1. Keep the `dsh-approval-hud` folder or the packed `dsh-approval-hud-0.3.1.tgz`.
+1. Keep the `dsh-approval-hud` folder or the packed `dsh-approval-hud-0.3.2.tgz`.
 2. Open DSH's **Plugins** page.
 3. Add a plugin by absolute spec:
    - folder: `link:C:\path\to\dsh-approval-hud`
-   - tarball: `file:C:\path\to\dsh-approval-hud-0.3.1.tgz`
+   - tarball: `file:C:\path\to\dsh-approval-hud-0.3.2.tgz`
 4. Restart DSH. A shield icon appears in the tray.
 
 ### B. install.ps1 (most reliable)
@@ -79,6 +79,7 @@ Then restart DSH.
 | Handle in DSH | Hands this request back to DSH's own approval card |
 | Drag the header | Moves the window and remembers the position |
 | `Enter` / `Esc` | Allow / reject when the window has focus |
+| Tray → Allow current / Reject current | Works even when the card is off-screen |
 | Tray double-click | Re-show the window |
 | Tray → Quit | Disables the HUD until the next DSH restart |
 

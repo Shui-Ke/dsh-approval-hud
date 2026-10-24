@@ -15,6 +15,8 @@
   "footer": "Enter 允许 · Esc 拒绝 · 仅本次生效",
   "idle": "DSH 审批浮窗 · 无待审批",
   "trayShow": "显示审批窗",
+  "trayAllow": "允许当前请求",
+  "trayReject": "拒绝当前请求",
   "trayQuit": "退出审批浮窗",
   "trayTip": "DSH 审批浮窗",
   "trayTipPending": "DSH 审批浮窗 · {0} 个待审批",

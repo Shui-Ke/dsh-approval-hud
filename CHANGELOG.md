@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2 — 2026-10-24
+
+- Clamp the card inside the work area after every layout pass and on a 350 ms timer, fixing a tall card that could grow below the desktop after the idle strip.
+- Add tray `Allow current request` / `Reject current request` as a fallback when the card is off-screen.
+- Keep the user's saved position when it is still valid; only move the window when it would overflow.
+
 ## 0.3.1 — 2026-10-24
 
 - Auto-approve durations are configurable: `autoApproveMinutes` (card, 1–480) and `autoApproveOptions` (tray, up to three values).

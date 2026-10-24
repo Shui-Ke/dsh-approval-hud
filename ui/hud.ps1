@@ -332,6 +332,12 @@ function Set-Labels {
   if ($null -ne $script:ShowMenuItem) {
     $script:ShowMenuItem.Text = T 'trayShow' 'Show approval window'
   }
+  if ($null -ne $script:AllowCurrentMenuItem) {
+    $script:AllowCurrentMenuItem.Text = T 'trayAllow' 'Allow current request'
+  }
+  if ($null -ne $script:RejectCurrentMenuItem) {
+    $script:RejectCurrentMenuItem.Text = T 'trayReject' 'Reject current request'
+  }
   if ($null -ne $script:QuitMenuItem) {
     $script:QuitMenuItem.Text = T 'trayQuit' 'Quit approval window'
   }
@@ -461,6 +467,39 @@ function Place-Window {
   $window.Top = $top
 }
 
+function Reposition-Hud {
+  if ($script:Quitting -or $null -eq $window -or -not $window.IsVisible) { return }
+  # Do not fight an in-progress drag; the next tick will clamp it.
+  if ([System.Windows.Input.Mouse]::LeftButton -eq [System.Windows.Input.MouseButtonState]::Pressed) { return }
+  $area = [Windows.SystemParameters]::WorkArea
+  $margin = 16
+  $width = if ($window.ActualWidth -gt 0) { $window.ActualWidth } else { $window.Width }
+  $height = if ($window.ActualHeight -gt 0) { $window.ActualHeight } else { $window.Height }
+  if ($width -le 0 -or $height -le 0) { return }
+
+  $targetLeft = $window.Left
+  $targetTop = $window.Top
+  if ($script:AnchorBottom) {
+    $targetTop = $area.Bottom - $height - $margin
+  }
+  $maxTop = $area.Bottom - $height - $margin
+  $minTop = $area.Top + $margin
+  if ($targetTop -gt $maxTop) { $targetTop = $maxTop }
+  if ($targetTop -lt $minTop) { $targetTop = $minTop }
+
+  $maxLeft = $area.Right - $width - $margin
+  $minLeft = $area.Left + $margin
+  if ($targetLeft -gt $maxLeft) { $targetLeft = $maxLeft }
+  if ($targetLeft -lt $minLeft) { $targetLeft = $minLeft }
+
+  $changed = $false
+  if ([Math]::Abs($window.Left - $targetLeft) -gt 0.5) { $window.Left = $targetLeft; $changed = $true }
+  if ([Math]::Abs($window.Top - $targetTop) -gt 0.5) { $window.Top = $targetTop; $changed = $true }
+  if ($changed) {
+    Write-UiLog ('reposition left={0} top={1} size={2}x{3} workBottom={4}' -f $window.Left, $window.Top, $width, $height, $area.Bottom)
+  }
+}
+
 function Keep-Topmost {
   if ($script:Quitting -or $null -eq $window -or -not $window.IsVisible) { return }
   $keep = $true
@@ -531,10 +570,8 @@ function Show-HudWindow {
   if (-not $script:Positioned) {
     Place-Window
     $script:Positioned = $true
-  } elseif ($script:AnchorBottom) {
-    $area = [Windows.SystemParameters]::WorkArea
-    $window.Top = $area.Bottom - $window.ActualHeight - 16
   }
+  Reposition-Hud
   $window.Topmost = $true
   Write-UiLog ('after-show visible=' + $window.IsVisible + ' actual=' + $window.ActualWidth + 'x' + $window.ActualHeight + ' left=' + $window.Left + ' top=' + $window.Top + ' title=' + $window.Title)
   try {
@@ -556,6 +593,7 @@ function Show-HudWindow {
   } catch { }
   Sync-VirtualDesktop -Force
   $script:Shown = $true
+  Reposition-Hud
 }
 
 function Hide-HudWindow {
@@ -577,6 +615,8 @@ function Show-Idle {
       $idleStopButton.Visibility = [System.Windows.Visibility]::Collapsed
     }
     Show-HudWindow
+    $window.UpdateLayout()
+    Reposition-Hud
   } else {
     Hide-HudWindow
   }
@@ -652,6 +692,9 @@ function Show-Item {
 
   if (-not $script:Shown) {
     Show-HudWindow
+  } else {
+    $window.UpdateLayout()
+    Reposition-Hud
   }
 
   if ($IsNew -and $script:CurrentConfig -and [bool]$script:CurrentConfig.sound -and $script:LastSoundId -ne [string]$Item.id) {
@@ -663,6 +706,13 @@ function Show-Item {
 function Update-Tray {
   param([int]$Count)
   $autoActive = $null -ne $script:AutoApprove -and [bool]$script:AutoApprove.active
+  $hasCurrent = $null -ne $script:CurrentItem -and -not $script:Busy
+  if ($null -ne $script:AllowCurrentMenuItem) {
+    $script:AllowCurrentMenuItem.Enabled = $hasCurrent
+  }
+  if ($null -ne $script:RejectCurrentMenuItem) {
+    $script:RejectCurrentMenuItem.Enabled = $hasCurrent
+  }
   if ($null -ne $script:StopAutoMenuItem) {
     $script:StopAutoMenuItem.Enabled = $autoActive
   }
@@ -1045,6 +1095,8 @@ function Quit {
 # A missing tray must not take the approval card down with it.
 $script:NotifyIcon = $null
 $script:ShowMenuItem = $null
+$script:AllowCurrentMenuItem = $null
+$script:RejectCurrentMenuItem = $null
 $script:Auto15MenuItem = $null
 $script:Auto30MenuItem = $null
 $script:Auto60MenuItem = $null
@@ -1062,6 +1114,8 @@ try {
 
   $menu = New-Object System.Windows.Forms.ContextMenuStrip
   $script:ShowMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+  $script:AllowCurrentMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+  $script:RejectCurrentMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
   $script:Auto15MenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
   $script:Auto30MenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
   $script:Auto60MenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
@@ -1070,6 +1124,8 @@ try {
   $separatorOne = New-Object System.Windows.Forms.ToolStripSeparator
   $separatorTwo = New-Object System.Windows.Forms.ToolStripSeparator
   [void]$menu.Items.Add($script:ShowMenuItem)
+  [void]$menu.Items.Add($script:AllowCurrentMenuItem)
+  [void]$menu.Items.Add($script:RejectCurrentMenuItem)
   [void]$menu.Items.Add($separatorOne)
   [void]$menu.Items.Add($script:Auto15MenuItem)
   [void]$menu.Items.Add($script:Auto30MenuItem)
@@ -1080,6 +1136,8 @@ try {
   $script:NotifyIcon.ContextMenuStrip = $menu
   $script:NotifyIcon.add_DoubleClick({ Show-Current })
   $script:ShowMenuItem.add_Click({ Show-Current })
+  $script:AllowCurrentMenuItem.add_Click({ Send-Decision 'allow' })
+  $script:RejectCurrentMenuItem.add_Click({ Send-Decision 'reject' })
   $script:Auto15MenuItem.add_Click({ Start-AutoApprove ([int]$script:Auto15MenuItem.Tag) })
   $script:Auto30MenuItem.add_Click({ Start-AutoApprove ([int]$script:Auto30MenuItem.Tag) })
   $script:Auto60MenuItem.add_Click({ Start-AutoApprove ([int]$script:Auto60MenuItem.Tag) })
@@ -1090,6 +1148,8 @@ try {
   Write-UiLog ('tray unavailable: ' + $_.Exception.Message)
   $script:NotifyIcon = $null
   $script:ShowMenuItem = $null
+  $script:AllowCurrentMenuItem = $null
+  $script:RejectCurrentMenuItem = $null
   $script:Auto15MenuItem = $null
   $script:Auto30MenuItem = $null
   $script:Auto60MenuItem = $null
@@ -1125,11 +1185,8 @@ $window.Add_Closing({
 })
 
 $window.Add_SizeChanged({
-  if ($script:Shown -and $script:AnchorBottom -and -not $script:Quitting) {
-    try {
-      $area = [Windows.SystemParameters]::WorkArea
-      $window.Top = $area.Bottom - $window.ActualHeight - 16
-    } catch { }
+  if ($script:Shown -and -not $script:Quitting) {
+    Reposition-Hud
   }
 })
 
@@ -1166,6 +1223,7 @@ $script:Timer.Add_Tick({
   $script:Tick += 1
   Poll
   Update-Elapsed
+  if ($script:Shown) { Reposition-Hud }
   if (($script:Tick % 2) -eq 0) { Sync-VirtualDesktop }
   if (($script:Tick % 5) -eq 0) { Keep-Topmost }
   if ($ParentPid -gt 0 -and ($script:Tick % 20) -eq 0) {

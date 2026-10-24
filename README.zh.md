@@ -31,17 +31,17 @@ DSH 默认把审批卡片放在对话输入框上方。窗口切走之后，agen
 安装后必须**重启 DSH 进程**（桌面版没有 HMR）；只刷新网页不够。
 
 > 不想自己打包？直接下载：
-> [0.3.1 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.1.tgz) ·
-> [0.3.1 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.1.zip)
+> [0.3.2 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.2.tgz) ·
+> [0.3.2 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.2.zip)
 > tgz 给插件管理器；zip 里带 `install.bat`、说明书和插件包。
 
 ### 方式 A：插件管理器
 
-1. 保留 `dsh-approval-hud` 文件夹，或已经打好的 `dsh-approval-hud-0.3.1.tgz`。
+1. 保留 `dsh-approval-hud` 文件夹，或已经打好的 `dsh-approval-hud-0.3.2.tgz`。
 2. 打开 DSH 的**插件**页面（侧边栏 → 插件，或设置 → 插件）。
 3. 添加插件，填绝对路径：
    - 文件夹：`link:C:\你的路径\dsh-approval-hud`
-   - 安装包：`file:C:\你的路径\dsh-approval-hud-0.3.1.tgz`
+   - 安装包：`file:C:\你的路径\dsh-approval-hud-0.3.2.tgz`
 4. 重启 DSH。
 5. 托盘出现盾牌图标，表示浮窗进程已启动。
 
@@ -91,6 +91,7 @@ dsh plugin --profile desktop add "link:C:\你的路径\dsh-approval-hud"
 | 拖动标题栏 | 移动窗口；位置会记住 |
 | `Enter` | 允许当前请求（窗口有焦点时） |
 | `Esc` | 拒绝当前请求 |
+| 托盘 → 允许当前请求 / 拒绝当前请求 | 卡片在屏幕外或看不到按钮时也能直接处理当前这条 |
 | 托盘双击 | 重新显示窗口 |
 | 托盘右键 → 退出审批浮窗 | 退出浮窗；之后审批回到 DSH，直到下次重启 |
 
@@ -183,6 +184,7 @@ dsh plugin --profile desktop add "link:C:\你的路径\dsh-approval-hud"
 | 有托盘图标，但审批仍出现在 DSH 里 | 浮窗还没就绪（首次启动约 1 秒）或 PowerShell 被拦截；看日志 |
 | 卡片不出现 | 检查托盘图标是否被隐藏；右键 → 显示审批窗 |
 | 卡片出现但按钮没反应 | 看 `%LOCALAPPDATA%\dsh-approval-hud\ui.log`；确认 DSH 还在运行 |
+| 卡片底部/按钮在屏幕外 | 0.3.2 起每 350ms 自动夹回工作区；同时可用托盘 → 允许/拒绝当前请求，或退出浮窗交回 DSH |
 | 想回到原生审批 | 插件页禁用，或在配置里设 `enabled: false`，重启 DSH |
 
 开启 `debug: true` 后会写：
