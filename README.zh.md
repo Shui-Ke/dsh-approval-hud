@@ -31,17 +31,17 @@ DSH 默认把审批卡片放在对话输入框上方。窗口切走之后，agen
 安装后必须**重启 DSH 进程**（桌面版没有 HMR）；只刷新网页不够。
 
 > 不想自己打包？直接下载：
-> [0.3.2 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.2.tgz) ·
-> [0.3.2 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.2.zip)
+> [0.3.3 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.3.tgz) ·
+> [0.3.3 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.3.zip)
 > tgz 给插件管理器；zip 里带 `install.bat`、说明书和插件包。
 
 ### 方式 A：插件管理器
 
-1. 保留 `dsh-approval-hud` 文件夹，或已经打好的 `dsh-approval-hud-0.3.2.tgz`。
+1. 保留 `dsh-approval-hud` 文件夹，或已经打好的 `dsh-approval-hud-0.3.3.tgz`。
 2. 打开 DSH 的**插件**页面（侧边栏 → 插件，或设置 → 插件）。
 3. 添加插件，填绝对路径：
    - 文件夹：`link:C:\你的路径\dsh-approval-hud`
-   - 安装包：`file:C:\你的路径\dsh-approval-hud-0.3.2.tgz`
+   - 安装包：`file:C:\你的路径\dsh-approval-hud-0.3.3.tgz`
 4. 重启 DSH。
 5. 托盘出现盾牌图标，表示浮窗进程已启动。
 
@@ -104,6 +104,7 @@ dsh plugin --profile desktop add "link:C:\你的路径\dsh-approval-hud"
 需要暂时离开、又不想每条审批都回来点，可以开启**限时托管**：
 
 - **托盘图标右键** → `托管 15 / 30 / 60 分钟`（可用 `autoApproveOptions` 改成最多 3 个自定义时长，单个 1–480 分钟）；或卡片底部 `同意并托管 {autoApproveMinutes} 分钟`。
+- **不想改配置**：托盘 → `自定义托管时长…`，输入 1–480 的整数即可立即开始；这次生效，不需要改 YAML，也不需要重启。
 - 开启后会先同意当前队列里能自动同意的请求，并在倒计时内自动同意后续审批；右下角/托盘会显示倒计时和已自动同意条数。
 - **续期**：托管期间再点托盘里的另一个时长，会从当前时间重新计时；每次请求最多 480 分钟。
 - **保持唤醒**：托管期间默认调用 `SetThreadExecutionState` 阻止空闲睡眠和息屏；停止、到期、关闭浮窗或 UI 退出后自动恢复。合盖、手动睡眠、组策略/电源计划强制睡眠仍可能覆盖它。

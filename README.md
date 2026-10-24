@@ -31,17 +31,17 @@ This plugin intercepts `approval/request` on the **host** side and renders each 
 A restart of the DSH process is required; refreshing the page is not enough.
 
 > Don't want to pack it yourself? Download:
-> [0.3.2 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.2.tgz) ·
-> [0.3.2 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.2.zip)
+> [0.3.3 tgz](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.3.tgz) ·
+> [0.3.3 zip](https://github.com/Shui-Ke/dsh-approval-hud/raw/main/dist/dsh-approval-hud-0.3.3.zip)
 > The tgz is for the plugin manager; the zip bundles `install.bat`, the docs and the plugin.
 
 ### A. Plugin manager
 
-1. Keep the `dsh-approval-hud` folder or the packed `dsh-approval-hud-0.3.2.tgz`.
+1. Keep the `dsh-approval-hud` folder or the packed `dsh-approval-hud-0.3.3.tgz`.
 2. Open DSH's **Plugins** page.
 3. Add a plugin by absolute spec:
    - folder: `link:C:\path\to\dsh-approval-hud`
-   - tarball: `file:C:\path\to\dsh-approval-hud-0.3.2.tgz`
+   - tarball: `file:C:\path\to\dsh-approval-hud-0.3.3.tgz`
 4. Restart DSH. A shield icon appears in the tray.
 
 ### B. install.ps1 (most reliable)
@@ -90,6 +90,7 @@ When several requests are pending, the oldest is shown with `1 / N`; answering i
 For stepping away without answering every prompt:
 
 - Right-click the tray icon → `Auto-approve 15 / 30 / 60 min` (customise with `autoApproveOptions`, up to three values, each 1–480), or click `Approve & auto-approve {autoApproveMinutes} min` on the card.
+- No config edit: tray → `Custom auto-approve duration…`, enter an integer from 1 to 480, and it starts immediately; no YAML and no restart for that run.
 - It approves the current queue (except held-back entries), then auto-approves requests until the countdown ends. The card/idle strip and tray tooltip show the remaining time and the number auto-approved.
 - Extend by choosing another tray duration; it restarts the countdown from now. Each request can be up to 480 minutes.
 - **Keep awake**: while auto-approve is active it calls `SetThreadExecutionState` to block idle sleep and display-off, then restores on stop/expiry/window close/UI exit. Lid close, manual sleep, or group-policy power settings can still override it.

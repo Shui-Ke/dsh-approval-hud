@@ -14,7 +14,8 @@ param(
   [string]$RenderTo = '',
   [ValidateSet('', 'allow', 'reject', 'delegate')][string]$AutoAnswer = '',
   [int]$AutoAnswerAfterMs = 1200,
-  [int]$AutoStartMinutes = 0
+  [int]$AutoStartMinutes = 0,
+  [switch]$TestCustomDialog
 )
 
 # The host passes the token over our stdin pipe, never on the command line.
@@ -322,6 +323,9 @@ function Set-Labels {
     } else {
       $autoItem.Visible = $false
     }
+  }
+  if ($null -ne $script:CustomAutoMenuItem) {
+    $script:CustomAutoMenuItem.Text = T 'trayAutoCustom' 'Custom auto-approve duration...'
   }
   if ($null -ne $script:StopAutoMenuItem) {
     $script:StopAutoMenuItem.Text = T 'trayStopAuto' 'Stop auto-approve'
@@ -869,6 +873,115 @@ function Stop-AutoApprove {
   if ($null -eq $script:CurrentItem) { Show-Idle }
 }
 
+function Show-AutoApproveDialog {
+  if ($script:Quitting) { return }
+  try {
+    $dialog = New-Object System.Windows.Window
+    $dialog.Title = T 'autoCustomTitle' 'Custom auto-approve duration'
+    $dialog.Width = 360
+    $dialog.SizeToContent = [System.Windows.SizeToContent]::Height
+    $dialog.ResizeMode = [System.Windows.ResizeMode]::NoResize
+    $dialog.WindowStartupLocation = [System.Windows.WindowStartupLocation]::CenterScreen
+    $dialog.Topmost = $true
+    $dialog.ShowInTaskbar = $false
+    $dialog.Background = $window.FindResource('CardFill')
+    $dialog.Foreground = $window.FindResource('TextPrimary')
+    $dialog.FontFamily = [System.Windows.Media.FontFamily]::new('Segoe UI')
+
+    $panel = New-Object System.Windows.Controls.StackPanel
+    $panel.Margin = [System.Windows.Thickness]::new(18)
+
+    $prompt = New-Object System.Windows.Controls.TextBlock
+    $prompt.Text = T 'autoCustomPrompt' 'Minutes (1-480):'
+    $prompt.Foreground = $window.FindResource('TextSecondary')
+    $prompt.Margin = [System.Windows.Thickness]::new(0, 0, 0, 8)
+    [void]$panel.Children.Add($prompt)
+
+    $input = New-Object System.Windows.Controls.TextBox
+    $input.Text = [string]$script:AutoMinutes
+    $input.FontSize = 18
+    $input.Padding = [System.Windows.Thickness]::new(8, 6, 8, 6)
+    $input.Background = [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.Color]::FromRgb(0x11, 0x15, 0x1C))
+    $input.Foreground = $window.FindResource('TextPrimary')
+    $input.BorderBrush = $window.FindResource('CardStroke')
+    $input.CaretBrush = $window.FindResource('TextPrimary')
+    [void]$panel.Children.Add($input)
+
+    $errorText = New-Object System.Windows.Controls.TextBlock
+    $errorText.Text = T 'autoCustomInvalid' 'Enter an integer between 1 and 480'
+    $errorText.Foreground = $window.FindResource('Warn')
+    $errorText.Margin = [System.Windows.Thickness]::new(0, 6, 0, 0)
+    $errorText.Visibility = [System.Windows.Visibility]::Collapsed
+    [void]$panel.Children.Add($errorText)
+
+    $buttons = New-Object System.Windows.Controls.StackPanel
+    $buttons.Orientation = [System.Windows.Controls.Orientation]::Horizontal
+    $buttons.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Right
+    $buttons.Margin = [System.Windows.Thickness]::new(0, 14, 0, 0)
+
+    $cancel = New-Object System.Windows.Controls.Button
+    $cancel.Content = T 'autoCustomCancel' 'Cancel'
+    $cancel.Style = $window.FindResource('SecondaryButton')
+    $cancel.IsCancel = $true
+    $cancel.Margin = [System.Windows.Thickness]::new(0, 0, 8, 0)
+    [void]$buttons.Children.Add($cancel)
+
+    $ok = New-Object System.Windows.Controls.Button
+    $ok.Content = T 'autoCustomOk' 'Start'
+    $ok.Style = $window.FindResource('PrimaryButton')
+    $ok.IsDefault = $true
+    [void]$buttons.Children.Add($ok)
+    [void]$panel.Children.Add($buttons)
+
+    $dialog.Content = $panel
+    $script:DialogMinutes = 0
+    $script:DialogWindow = $dialog
+    $script:DialogInput = $input
+    $script:DialogError = $errorText
+    $script:DialogTestTimer = $null
+
+    $ok.Add_Click({
+      $parsed = 0
+      if ([int]::TryParse($script:DialogInput.Text.Trim(), [ref]$parsed) -and $parsed -ge 1 -and $parsed -le 480) {
+        $script:DialogMinutes = $parsed
+        $script:DialogWindow.DialogResult = $true
+      } else {
+        $script:DialogError.Visibility = [System.Windows.Visibility]::Visible
+      }
+    })
+    $cancel.Add_Click({
+      $script:DialogWindow.DialogResult = $false
+    })
+    $dialog.Add_Loaded({
+      $script:DialogInput.Focus()
+      $script:DialogInput.SelectAll()
+    })
+
+    if ($TestCustomDialog) {
+      $script:DialogTestTimer = New-Object System.Windows.Threading.DispatcherTimer
+      $script:DialogTestTimer.Interval = [TimeSpan]::FromMilliseconds(250)
+      $script:DialogTestTimer.Add_Tick({
+        $script:DialogTestTimer.Stop()
+        $script:DialogMinutes = 42
+        $script:DialogWindow.DialogResult = $true
+      })
+      $script:DialogTestTimer.Start()
+    }
+
+    $result = $dialog.ShowDialog()
+    $minutes = [int]$script:DialogMinutes
+    $script:DialogWindow = $null
+    $script:DialogInput = $null
+    $script:DialogError = $null
+    $script:DialogTestTimer = $null
+    if ($result -eq $true -and $minutes -ge 1) {
+      Start-AutoApprove $minutes
+    }
+  } catch {
+    Write-UiLog ('custom auto-approve dialog failed: ' + $_.Exception.Message)
+  }
+}
+
 function Send-Ready {
   for ($attempt = 0; $attempt -lt 6; $attempt++) {
     $result = Invoke-HudApi -Method POST -Path '/ready' -Body '{}'
@@ -1100,6 +1213,7 @@ $script:RejectCurrentMenuItem = $null
 $script:Auto15MenuItem = $null
 $script:Auto30MenuItem = $null
 $script:Auto60MenuItem = $null
+$script:CustomAutoMenuItem = $null
 $script:StopAutoMenuItem = $null
 $script:QuitMenuItem = $null
 try {
@@ -1119,6 +1233,7 @@ try {
   $script:Auto15MenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
   $script:Auto30MenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
   $script:Auto60MenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+  $script:CustomAutoMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
   $script:StopAutoMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
   $script:QuitMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
   $separatorOne = New-Object System.Windows.Forms.ToolStripSeparator
@@ -1130,6 +1245,7 @@ try {
   [void]$menu.Items.Add($script:Auto15MenuItem)
   [void]$menu.Items.Add($script:Auto30MenuItem)
   [void]$menu.Items.Add($script:Auto60MenuItem)
+  [void]$menu.Items.Add($script:CustomAutoMenuItem)
   [void]$menu.Items.Add($script:StopAutoMenuItem)
   [void]$menu.Items.Add($separatorTwo)
   [void]$menu.Items.Add($script:QuitMenuItem)
@@ -1141,6 +1257,7 @@ try {
   $script:Auto15MenuItem.add_Click({ Start-AutoApprove ([int]$script:Auto15MenuItem.Tag) })
   $script:Auto30MenuItem.add_Click({ Start-AutoApprove ([int]$script:Auto30MenuItem.Tag) })
   $script:Auto60MenuItem.add_Click({ Start-AutoApprove ([int]$script:Auto60MenuItem.Tag) })
+  $script:CustomAutoMenuItem.add_Click({ Show-AutoApproveDialog })
   $script:StopAutoMenuItem.add_Click({ Stop-AutoApprove })
   $script:QuitMenuItem.add_Click({ Quit })
   $script:NotifyIcon.Visible = $true
@@ -1153,6 +1270,7 @@ try {
   $script:Auto15MenuItem = $null
   $script:Auto30MenuItem = $null
   $script:Auto60MenuItem = $null
+  $script:CustomAutoMenuItem = $null
   $script:StopAutoMenuItem = $null
   $script:QuitMenuItem = $null
 }
@@ -1238,6 +1356,15 @@ Write-UiLog ('ui starting pid={0} parent={1} port={2}' -f $PID, $ParentPid, $Por
 [void](Send-Ready)
 if ($AutoStartMinutes -gt 0) {
   Start-AutoApprove $AutoStartMinutes
+}
+if ($TestCustomDialog) {
+  $script:OpenTimer = New-Object System.Windows.Threading.DispatcherTimer
+  $script:OpenTimer.Interval = [TimeSpan]::FromMilliseconds(400)
+  $script:OpenTimer.Add_Tick({
+    $script:OpenTimer.Stop()
+    Show-AutoApproveDialog
+  })
+  $script:OpenTimer.Start()
 }
 $script:LastSuccess = [DateTime]::UtcNow
 $script:Timer.Start()

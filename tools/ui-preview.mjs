@@ -22,7 +22,7 @@ const answers = []
 let autoActive = mode.startsWith('auto')
 let autoUntil = autoActive ? Date.now() + 899000 : 0
 let autoCount = autoActive ? 2 : 0
-const idleOnly = mode === 'auto-idle' || mode === 'start-auto'
+const idleOnly = mode === 'auto-idle' || mode === 'start-auto' || mode === 'custom-dialog'
 
 const item = {
   id: 'mock-1',
@@ -119,6 +119,7 @@ server.listen(0, '127.0.0.1', () => {
     '-Language', 'zh', '-DataDir', dataDir, '-DebugLog', '-RenderTo', renderTo,
   ]
   if (mode === 'start-auto') args.push('-AutoStartMinutes', '15')
+  if (mode === 'custom-dialog') args.push('-TestCustomDialog')
   const child = spawn('powershell.exe', args, { windowsHide: true, stdio: 'inherit' })
   child.on('exit', (code) => {
     console.log('PS_EXIT', code)

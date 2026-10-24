@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.3 — 2026-10-24
+
+- Add tray `Custom auto-approve duration...`: enter 1–480 minutes and start immediately, without editing YAML or restarting.
+- Fix the custom dialog's control references so the Start/Cancel handlers work reliably.
+
 ## 0.3.2 — 2026-10-24
 
 - Clamp the card inside the work area after every layout pass and on a 350 ms timer, fixing a tall card that could grow below the desktop after the idle strip.
